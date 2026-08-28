@@ -38,13 +38,14 @@ Rolls up **% eliminated**, counts per state, and the on-hand units tied in retir
 ## Files
 | File | Role |
 |---|---|
-| `index.html` | The tool — UI, file loading, rendering, export |
+| `index.html` | The **engine** — load SAP files, derive, export the canonical JSON |
+| `viewer.html` | The **desktop/tablet viewer** — load a `calibre_map_dataset_*.json` → overview, scoreboard, materials (+ where-used drill-down), families, needs-ID. Read-only; the campaign tracking lives here. Responsive → same file serves laptop and tablet. |
 | `engine.js` | Framework-free core derivations (runs in Node and browser) — the single source of truth for the math |
 | `numacore_lib.js` | Shared NumaCore helpers (dates, category vocabulary, formatting) |
 | `vendor/xlsx.full.min.js` | SheetJS (vendored — offline, no CDN) |
 
 ## Roadmap (see the design doc in the Calibre Map repo)
-**Done:** Phase 1 consumption · Phase 2 enrichment · Phase 3 verification merge · Phase 4 removal scoreboard · Phase 5 canonical dataset out. **Next:** the desktop viewer (reads this JSON) · quick-identify triage for new parts · testing on a real refresh.
+**Done:** Phase 1 consumption · Phase 2 enrichment · Phase 3 verification merge · Phase 4 removal scoreboard · Phase 5 canonical dataset out · **the Viewer** (`viewer.html`, laptop + tablet). **Next:** quick-identify triage for new parts · testing on a real refresh.
 
 ## Data governance
 This repo is **tool code only**. `.gitignore` blocks every data format (`*.xlsx`, `*.csv`, `*.json`, `*.pdf`). Client data is loaded client-side and the derived JSON is downloaded to your machine — it never touches the repo. Same model as the public Calibre Trend / Trace tools.

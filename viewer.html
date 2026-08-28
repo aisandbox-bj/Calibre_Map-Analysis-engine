@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calibre Map — Viewer</title>
+<style>
+  :root{
+    --void:#0A0D1A; --deep:#04101d; --surface:#0c1622; --surface2:#0a1420; --chrome:#14161D; --border:#22303a;
+    --text:#E8E9ED; --text2:#D6DFDE; --muted:#9aa7b4; --dim:#63776f; --line:rgba(31,206,216,.14);
+    --green:#23B58A; --greenb:#3FE0AE; --map:#378ADD; --amber:#E7B45B; --violet:#9B97E8;
+    --ok:#34D399; --warn:#FBBF24; --crit:#EF4444;
+    --mono:'JetBrains Mono',ui-monospace,Consolas,monospace; --body:'Barlow','Segoe UI',system-ui,sans-serif;
+    --disp:'Barlow Condensed','Arial Narrow',sans-serif; --head:'Rajdhani','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--void);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.5;min-height:100vh}
+  a{color:var(--map)}
+  header{display:flex;align-items:center;gap:13px;padding:14px 22px;background:linear-gradient(90deg,var(--deep),var(--surface));border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+  header .mark{width:30px;height:30px;flex:none;filter:drop-shadow(0 0 5px rgba(35,181,160,.5))}
+  header h1{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:.12em}
+  header h1 i{font-style:normal;color:var(--greenb)}
+  header h1 small{font-family:var(--mono);font-weight:400;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-left:8px}
+  header .sp{flex:1}
+  .btn{background:var(--green);color:#062018;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--body)}
+  .btn.ghost{background:transparent;color:var(--greenb);border:1px solid rgba(63,201,160,.4)}
+  .meta{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.04em}
+  nav.tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:59px;z-index:19;overflow-x:auto}
+  nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--head);font-weight:600;font-size:14px;padding:12px 16px;cursor:pointer;white-space:nowrap}
+  nav.tabs button.on{color:var(--greenb);border-bottom-color:var(--green)}
+  .wrap{max-width:1200px;margin:0 auto;padding:22px}
+  /* drop / empty */
+  .drop{max-width:640px;margin:60px auto;border:2px dashed var(--border);border-radius:16px;padding:56px 30px;text-align:center;background:var(--surface2)}
+  .drop.over{border-color:var(--green);background:rgba(35,181,138,.06)}
+  .drop svg{width:56px;height:56px;margin-bottom:18px;opacity:.85}
+  .drop h2{font-family:var(--disp);font-size:26px;text-transform:uppercase;letter-spacing:.02em;margin-bottom:8px}
+  .drop p{color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.6}
+  .drop .mono{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  /* kpis */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:10px;padding:14px 16px}
+  .kpi .n{font-family:var(--disp);font-size:30px;font-weight:700;line-height:1}
+  .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:5px}
+  .kpi.amber{border-left-color:var(--amber)} .kpi.amber .n{color:var(--amber)}
+  .kpi.crit{border-left-color:var(--crit)} .kpi.crit .n{color:var(--crit)}
+  .kpi.ok{border-left-color:var(--ok)} .kpi.ok .n{color:var(--ok)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+  .card h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--greenb);margin-bottom:14px;font-weight:500}
+  .bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin:6px 0 10px}
+  .bar span{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#04121f;font-weight:500;min-width:0}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .search{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--mono);font-size:13px;width:280px;max-width:100%}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border)}
+  th{background:var(--chrome);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text);cursor:pointer;position:sticky;top:107px}
+  th.num,td.num{text-align:right;font-family:var(--mono)}
+  td.mn{font-family:var(--mono);color:var(--map);cursor:pointer}
+  tbody tr:hover{background:rgba(55,138,221,.06)}
+  .tblwrap{max-height:64vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
+  .pill{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
+  .pill.elim{color:var(--dim);border-color:var(--dim)}
+  .pill.run{color:var(--ok);border-color:rgba(52,211,153,.5)}
+  .pill.risk{color:var(--crit);border-color:rgba(239,68,68,.5)}
+  .pill.same{color:var(--ok);border-color:rgba(52,211,153,.5)}
+  .pill.split{color:var(--warn);border-color:rgba(251,191,36,.5)}
+  .pill.prov{color:var(--violet);border-color:rgba(155,151,232,.5)}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .fam{background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:15px 17px}
+  .fam .fh{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .fam .fid{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:.04em}
+  .memb{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-family:var(--mono);font-size:12px;border-top:1px dashed var(--border)}
+  .memb .keep{color:var(--ok)} .memb .ret{color:var(--crit)}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,92vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-20px 0 60px rgba(0,0,0,.5);transform:translateX(100%);transition:transform .22s;z-index:40;overflow-y:auto;padding:22px}
+  .drawer.open{transform:translateX(0)}
+  .drawer .x{position:absolute;top:14px;right:16px;background:var(--chrome);border:1px solid var(--border);color:var(--text);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:16px}
+  .drawer h2{font-family:var(--disp);font-size:26px;letter-spacing:.02em}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:5px 12px;font-size:13px;margin:12px 0}
+  .kv .k{color:var(--dim);text-transform:uppercase;font-size:11px;font-family:var(--head);font-weight:600;letter-spacing:.04em}
+  .kv .v{color:var(--text)} .kv .v.mono{font-family:var(--mono);font-size:12.5px}
+  .wu{margin-top:6px}
+  .wu .u{border-top:1px solid var(--border);padding:8px 0}
+  .wu .uh{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12.5px}
+  .wu .uh b{color:var(--greenb)}
+  .wu .wos{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+  .hidden{display:none}
+  @media(max-width:640px){ .wrap{padding:14px} th{top:99px} .kpi .n{font-size:24px} }
+</style>
+</head>
+<body>
+<header>
+  <svg class="mark" viewBox="0 0 120 120" fill="none"><g stroke="#23B58A" stroke-width="6" stroke-linecap="round"><line x1="60" y1="60" x2="34" y2="34"/><line x1="60" y1="60" x2="88" y2="34"/><line x1="60" y1="60" x2="34" y2="88"/><line x1="60" y1="60" x2="88" y2="88"/><line x1="34" y1="34" x2="88" y2="34"/><line x1="34" y1="88" x2="88" y2="88"/></g><g fill="#0A0D1A" stroke="#23B58A" stroke-width="6"><circle cx="34" cy="34" r="9"/><circle cx="88" cy="34" r="9"/><circle cx="34" cy="88" r="9"/><circle cx="88" cy="88" r="9"/></g><circle cx="60" cy="60" r="11" fill="#23B58A"/></svg>
+  <h1>Calibre <i>Map</i><small>Viewer</small></h1>
+  <div class="sp"></div>
+  <span class="meta" id="hmeta"></span>
+  <button class="btn ghost" id="loadBtn2" style="display:none">Load another</button>
+  <input type="file" id="file" accept=".json" hidden>
+</header>
+<nav class="tabs hidden" id="tabs">
+  <button data-t="overview" class="on">Overview</button>
+  <button data-t="materials">Materials</button>
+  <button data-t="families">Families</button>
+  <button data-t="needs">Needs&nbsp;ID</button>
+</nav>
+
+<div class="wrap">
+  <div id="empty" class="drop">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#3FE0AE" stroke-width="1.5"><path d="M12 15V3m0 0-4 4m4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    <h2>Load a dataset</h2>
+    <p>Drop a <span class="mono">calibre_map_dataset_*.json</span> here, or click to choose.<br>This is the canonical JSON the Analysis Engine exports.</p>
+    <button class="btn" id="loadBtn">Choose file…</button>
+    <div class="mono" style="margin-top:20px">Runs entirely in your browser · nothing is uploaded · datasets come from the <a href="index.html" style="color:var(--greenb)">Analysis Engine</a></div>
+  </div>
+  <div id="view" class="hidden"></div>
+</div>
+
+<div class="drawer" id="drawer"><button class="x" id="drawerX">✕</button><div id="drawerBody"></div></div>
+
+<script src="numacore_lib.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (window.NumaCoreLib&&NumaCoreLib.esc)?NumaCoreLib.esc(s):String(s==null?'':s);
+const nf = n => (typeof n==='number'? n.toLocaleString() : (n==null?'':n));
+let DATA=null, tab='overview', sortK='net_consumed', sortDir=-1, q='';
+
+// ---- loading ----
+function pick(){ $('#file').click(); }
+$('#loadBtn').addEventListener('click', pick);
+$('#loadBtn2').addEventListener('click', pick);
+$('#file').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f); });
+['dragover','dragenter'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();$('#empty').classList.add('over');}));
+['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();$('#empty').classList.remove('over');}));
+document.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f&&f.name.toLowerCase().endsWith('.json')) readFile(f); });
+function readFile(f){ const r=new FileReader(); r.onload=()=>{ try{ load(JSON.parse(r.result)); }catch(err){ alert('Could not parse JSON: '+err.message); } }; r.readAsText(f); }
+
+function load(d){
+  DATA=d;
+  const m=d.meta||{}, c=d.counts||{};
+  $('#hmeta').textContent = (d.schemaVersion?('schema v'+d.schemaVersion+' · '):'') + (m.generatedAt?('generated '+String(m.generatedAt).slice(0,10)):'');
+  $('#empty').classList.add('hidden'); $('#view').classList.remove('hidden'); $('#tabs').classList.remove('hidden'); $('#loadBtn2').style.display='';
+  render();
+}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  tab=b.dataset.t; document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.toggle('on',x===b)); render();
+}));
+
+// ---- render ----
+function render(){
+  if(!DATA) return;
+  if(tab==='overview') renderOverview();
+  else if(tab==='materials') renderMaterials();
+  else if(tab==='families') renderFamilies();
+  else if(tab==='needs') renderNeeds();
+}
+
+function renderOverview(){
+  const c=DATA.counts||{}, sb=DATA.scoreboard||null, m=DATA.meta||{};
+  const kp=[
+    ['materials', (c.materials!=null?c.materials:(DATA.materials||[]).length), ''],
+    ['families verified', (c.families!=null?c.families:(DATA.families||[]).length), ''],
+    ['dispositions', (c.dispositions!=null?c.dispositions:(DATA.duplicate_disposition||[]).length), ''],
+    ['need identification', (c.needsIdentification!=null?c.needsIdentification:(DATA.needs_identification||[]).length), 'amber'],
+  ];
+  let sbHtml='';
+  if(sb){
+    const tot=sb.retireSkus||0;
+    const seg=(n,cls,lbl)=>{ const pct=tot?Math.round(100*n/tot):0; return pct? `<span style="width:${pct}%;background:${cls}">${pct>7?n:''}</span>`:''; };
+    sbHtml = `<div class="card"><h3>Removal scoreboard — duplicate disposition</h3>
+      <div class="kpis" style="margin-bottom:10px">
+        <div class="kpi ok"><div class="n">${sb.pctEliminated}%</div><div class="l">eliminated</div></div>
+        <div class="kpi crit"><div class="n">${sb.reorderRisk}</div><div class="l">reorder-on-retire</div></div>
+        <div class="kpi ok"><div class="n">${sb.runningDown}</div><div class="l">running-down</div></div>
+        <div class="kpi"><div class="n">${sb.retireSkus}</div><div class="l">retire SKUs · ${sb.families} families</div></div>
+      </div>
+      <div class="bar">${seg(sb.eliminated,'var(--dim)')}${seg(sb.runningDown,'var(--ok)')}${seg(sb.reorderRisk,'var(--crit)')}</div>
+      <div class="legend"><span><i style="background:var(--dim)"></i>eliminated (0 stock)</span><span><i style="background:var(--ok)"></i>running-down</span><span><i style="background:var(--crit)"></i>reorder-on-retire</span></div>
+      <div class="note">${nf(sb.onHandInRetire)} units on-hand tied in retired numbers to run down${sb.provisionalFamilies?` · ${sb.provisionalFamilies} family(ies) “no technical preference”`:''}.</div></div>`;
+  }
+  $('#view').innerHTML = `
+    <div class="kpis">${kp.map(([l,n,cls])=>`<div class="kpi ${cls}"><div class="n">${nf(n)}</div><div class="l">${l}</div></div>`).join('')}</div>
+    ${sbHtml || '<div class="card"><h3>Removal scoreboard</h3><div class="note">No disposition data in this dataset (load field captures in the engine to populate it).</div></div>'}
+    <div class="card"><h3>Dataset</h3><div class="kv">
+      <div class="k">Schema</div><div class="v mono">v${esc(DATA.schemaVersion||'?')}</div>
+      <div class="k">Client</div><div class="v">${esc(m.clientCode||'—')}${m.site?' · '+esc(m.site):''}</div>
+      <div class="k">Generated</div><div class="v mono">${esc(m.generatedAt||'—')}</div>
+      <div class="k">Engine phase</div><div class="v">${esc(m.phase||'—')}</div>
+      <div class="k">Sources</div><div class="v mono" style="font-size:11.5px">${Object.values(m.sourceFiles||{}).filter(Boolean).map(esc).join('<br>')||'—'}</div>
+    </div></div>`;
+}
+
+function renderMaterials(){
+  const cols=[['mn','Material'],['desc','Description'],['net_consumed','Net',1],['on_hand','On hand',1],['mrp_type','MRP'],['duplicate_group','Dup group'],['disposition','Disposition']];
+  let rows=(DATA.materials||[]).slice();
+  if(q){ const s=q.toLowerCase(); rows=rows.filter(m=> String(m.material).toLowerCase().includes(s) || String(m.description||'').toLowerCase().includes(s)); }
+  rows.sort((a,b)=>{ const k=sortK; let x=a[k], y=b[k]; if(k==='mn'){x=a.material;y=b.material;} if(typeof x==='string'||typeof y==='string'){x=String(x||'').toLowerCase();y=String(y||'').toLowerCase();return sortDir*(x<y?-1:x>y?1:0);} return sortDir*((x||0)-(y||0)); });
+  const cap=600, show=rows.slice(0,cap);
+  const dpill=d=> d==='reorder_risk'?'<span class="pill risk">reorder</span>':d==='running_down'?'<span class="pill run">running-down</span>':d==='eliminated'?'<span class="pill elim">eliminated</span>':'';
+  $('#view').innerHTML = `
+    <div class="row"><input class="search" id="q" placeholder="filter material / description…" value="${esc(q)}"><span class="note">${nf(rows.length)} materials${rows.length>cap?` (showing ${cap})`:''}</span></div>
+    <div class="tblwrap"><table><thead><tr>
+      ${cols.map(([k,l,n])=>`<th data-k="${k}" class="${n?'num':''}">${l}</th>`).join('')}
+    </tr></thead><tbody>
+      ${show.map(m=>`<tr>
+        <td class="mn" data-mn="${esc(m.material)}">${esc(m.material)}</td>
+        <td>${esc(m.description||'')}</td>
+        <td class="num">${nf(m.net_consumed)}</td>
+        <td class="num">${m.on_hand==null?'':nf(m.on_hand)}</td>
+        <td class="mono" style="font-family:var(--mono)">${esc(m.mrp_type||'')}</td>
+        <td>${esc(m.duplicate_group||'')}</td>
+        <td>${dpill(m.disposition)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  $('#q').addEventListener('input', e=>{ q=e.target.value; const p=e.target.selectionStart; renderMaterials(); const nq=$('#q'); nq.focus(); nq.setSelectionRange(p,p); });
+  document.querySelectorAll('#view th').forEach(th=>th.addEventListener('click',()=>{ const k=th.dataset.k; if(sortK===k) sortDir=-sortDir; else{ sortK=k; sortDir=(k==='mn'||k==='desc'||k==='mrp_type'||k==='duplicate_group'||k==='disposition')?1:-1; } renderMaterials(); }));
+  document.querySelectorAll('#view td.mn').forEach(td=>td.addEventListener('click',()=>openMaterial(td.dataset.mn)));
+}
+
+function openMaterial(mn){
+  const m=(DATA.materials||[]).find(x=>String(x.material)===String(mn)); if(!m) return;
+  const wu=(m.where_used||[]);
+  $('#drawerBody').innerHTML = `
+    <div style="font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.1em">SAP# ${esc(m.material)}</div>
+    <h2>${esc(m.pn||m.description||m.material)}</h2>
+    <div style="color:var(--muted);font-size:13px;margin-top:2px">${esc(m.traced_brand?m.traced_brand+' · ':'')}${esc(m.description||'')}</div>
+    <div class="kv">
+      <div class="k">Net consumed</div><div class="v">${nf(m.net_consumed)}</div>
+      <div class="k">On hand</div><div class="v">${m.on_hand==null?'—':nf(m.on_hand)}</div>
+      <div class="k">MRP / ROP / Max</div><div class="v mono">${esc(m.mrp_type||'—')} · ${m.rop==null?'—':m.rop} · ${m.max==null?'—':m.max}</div>
+      <div class="k">Vendor PN</div><div class="v mono">${esc(m.pn||'—')}</div>
+      <div class="k">Duplicate group</div><div class="v">${esc(m.duplicate_group||'—')}</div>
+      ${m.disposition?`<div class="k">Disposition</div><div class="v">${esc(m.disposition)}</div>`:''}
+      ${m.identified===false?`<div class="k">Identity</div><div class="v" style="color:var(--amber)">not in master — needs identification</div>`:''}
+    </div>
+    <h3 style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--greenb);margin:16px 0 6px">Where used — ${wu.length} unit${wu.length!==1?'s':''}</h3>
+    <div class="wu">${wu.slice(0,40).map(u=>`<div class="u"><div class="uh"><span>${esc(u.unit)}</span><b>${nf(u.qty)}</b></div>${(u.wos||[]).slice(0,6).map(w=>`<div class="wos">${esc(w[0])} · ${nf(w[1])} · ${esc(w[2])} · ${esc(w[3]||'')}</div>`).join('')}</div>`).join('') || '<div class="note">No work-order issues recorded.</div>'}</div>`;
+  $('#drawer').classList.add('open');
+}
+$('#drawerX').addEventListener('click',()=>$('#drawer').classList.remove('open'));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('#drawer').classList.remove('open'); });
+
+function renderFamilies(){
+  const fams=(DATA.families||[]);
+  const vp=v=> v==='SAME'?'<span class="pill same">SAME → merge</span>':v==='SPLIT'?'<span class="pill split">SPLIT</span>':'<span class="pill">'+esc(v)+'</span>';
+  $('#view').innerHTML = fams.length ? `<div class="grid2">${fams.map(f=>`
+    <div class="fam"><div class="fh"><span class="fid">${esc(f.family_id)}</span>${vp(f.verdict)}${f.provisional?'<span class="pill prov">no tech pref</span>':''}</div>
+      ${(f.members||[]).map(mm=>`<div class="memb"><span>${esc(mm.material)}</span><span class="${mm.keep?'keep':'ret'}">${mm.keep?'KEEP':'retire'} · pile ${esc(mm.pile)}</span></div>`).join('')}
+      <div class="note">${f.tech?('by '+esc(f.tech)+' · '):''}${f.ts?String(f.ts).slice(0,10):''}${f.site_answer?' · “'+esc(f.site_answer)+'”':''}</div>
+    </div>`).join('')}</div>`
+    : '<div class="card"><h3>Families</h3><div class="note">No field-verified families in this dataset yet.</div></div>';
+}
+
+function renderNeeds(){
+  const n=(DATA.needs_identification||[]);
+  $('#view').innerHTML = `<div class="card"><h3>Needs identification — ${n.length}</h3>
+    <div class="note" style="margin-bottom:12px">Materials consumed on work orders but absent from the material master — candidates for the assessment tool.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">${n.map(mn=>`<span class="pill" style="cursor:pointer;color:var(--map)" onclick="(${''})">${esc(mn)}</span>`).join('') || '<span class="note">None — every consumed material is in the master.</span>'}</div></div>`;
+}
+</script>
+</body>
+</html>
