@@ -97,6 +97,7 @@
       <div class="kpis" id="kpis"></div>
       <div id="verifBox"></div>
       <div id="scoreBox"></div>
+      <div id="canonBox"></div>
       <div id="validBox"></div>
     </div>
 
@@ -242,6 +243,8 @@ $('#run').addEventListener('click', async ()=>{
                   net_consumed:r.net, on_hand: enriched?m.onHand:undefined,
                   mrp_type:m.mrpType||undefined, rop: enriched?m.rop:undefined, max: enriched?m.max:undefined,
                   traced_brand:m.tracedBrand||undefined, duplicate_group:m.dupGroup||undefined,
+                  identified: m.identified,
+                  where_used: (m.whereUsed&&m.whereUsed.length)?m.whereUsed:undefined,
                   consuming_units:r.units, consumed_by_unit:r.byUnit, consumed_by_group:r.byGroup||undefined }; }) };
     tableRows = rows;
 
@@ -260,6 +263,15 @@ $('#run').addEventListener('click', async ()=>{
     renderKPIs(mats, rows, iw);
     if (files.gold) await validate(mats); else $('#validBox').innerHTML='';
     sortK='net'; sortDir=-1; renderTable();
+
+    // Phase 5 — assemble the one canonical dataset (the shared contract)
+    derived = CalibreEngine.assembleCanonical(derived, {
+      generatedAt: new Date().toISOString(),
+      sourceFiles: { mb51: files.mb51&&files.mb51.name, iw39: files.iw39&&files.iw39.name, invMstr: files.invmstr&&files.invmstr.name, master: files.master&&files.master.name },
+      phase: derived.meta.phase
+    });
+    renderCanonical(derived);
+
     $('#results').classList.remove('hidden');
     setStatus('Done — '+rows.length+' materials with net consumption.');
   }catch(err){ setStatus('Error: '+err.message); console.error(err); }
@@ -281,6 +293,14 @@ function renderKPIs(mats, rows, iw){
     ['Materials seen (incl. net ≤ 0)', Object.keys(mats).length.toLocaleString()],
   ];
   $('#kpis').innerHTML = kp.map(([l,n])=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+function renderCanonical(d){
+  const box = $('#canonBox'); if(!box) return; const c = d.counts||{};
+  box.innerHTML = `<div style="margin-top:14px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--violet);border-radius:8px;padding:12px 16px">
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--violet);margin-bottom:6px">Canonical dataset · schema v${d.schemaVersion} · phase ${d.meta.phase}</div>
+    <div class="note" style="margin:0">${c.materials} materials · ${c.families} families · ${c.dispositions} dispositions · ${c.verifications} verifications${c.needsIdentification?` · ${c.needsIdentification} need identification`:''}. This one JSON is the shared contract — <b>Export JSON</b> to hand to the app / desktop viewer.</div>
+  </div>`;
 }
 
 function renderScoreboard(sb){
@@ -356,7 +376,7 @@ $('#export').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify(derived,null,2)], {type:'application/json'});
   const url = URL.createObjectURL(blob); const a=document.createElement('a');
   const stamp = new Date().toISOString().slice(0,10);
-  a.href=url; a.download='consumption_by_unit_'+stamp+'.json'; a.click();
+  a.href=url; a.download='calibre_map_dataset_'+stamp+'.json'; a.click();
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
 });
 </script>

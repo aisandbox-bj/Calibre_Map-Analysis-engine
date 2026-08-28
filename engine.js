@@ -135,8 +135,12 @@
   function enrich(materials, opts) {
     opts = opts || {};
     var inv = opts.invByMat || {}, tr = opts.tracedByMat || {};
+    var hasInv = inv && Object.keys(inv).length > 0;
     Object.keys(materials).forEach(function (mn) {
       var m = materials[mn], i = inv[mn] || {}, t = tr[mn] || {};
+      // "identified" = present in the material master (INV MSTR). A consumed
+      // material absent from the master is genuinely unknown → needs identification.
+      if (hasInv) m.identified = !!inv[mn];
       m.description  = s(i['Material Description']) || s(t['Description']) || '';
       m.pn           = s(i['Manufacturer Part No.']) || s(t['PN']) || '';
       m.onHand       = numOrBlank(i['OnHand']);
@@ -238,12 +242,63 @@
     return { rows: rows, kpi: k };
   }
 
+  // ── Phase 5: assemble the one canonical dataset (the shared contract) ──
+  // Formalizes the computed pieces into a single versioned object the engine
+  // emits, build_app.py packages, and the desktop viewer reads. Pure assembly.
+  var SCHEMA_VERSION = '1.0.0';
+  function assembleCanonical(dataset, meta) {
+    dataset = dataset || {}; meta = meta || {};
+    var mats = dataset.materials || [];
+    // families ← field-verified verdicts (Phase 3)
+    var families = (dataset.verification || []).filter(function (v) { return v.verdict; }).map(function (v) {
+      var members = [];
+      Object.keys(v.piles || {}).forEach(function (p) {
+        (v.piles[p] || []).forEach(function (mn) {
+          members.push({ material: mn, pile: p, keep: !!(v.keep && v.keep[p] === mn) });
+        });
+      });
+      return {
+        family_id: v.family_id, verdict: v.verdict, keep: v.keep || {}, retire: v.retire || [],
+        provisional: !!v.provisional, tech: v.tech || '', ts: v.ts || '', site_answer: v.site_answer || '',
+        members: members
+      };
+    });
+    // disposition status back onto each material
+    var dispBy = {};
+    (dataset.duplicate_disposition || []).forEach(function (d) { dispBy[d.retire] = d.status; });
+    var materials = mats.map(function (m) {
+      var out = {}; Object.keys(m).forEach(function (k) { if (k.charAt(0) !== '_') out[k] = m[k]; });
+      if (dispBy[m.material]) out.disposition = dispBy[m.material];
+      return out;
+    });
+    var needs = materials.filter(function (m) { return m.identified === false; }).map(function (m) { return m.material; });
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      meta: {
+        tool: 'calibre-analysis-engine', generatedAt: meta.generatedAt || '',
+        clientCode: meta.clientCode || '', site: meta.site || '',
+        sourceFiles: meta.sourceFiles || {}, phase: meta.phase || 5, engineVersion: '0.5.0'
+      },
+      counts: {
+        materials: materials.length, families: families.length,
+        dispositions: (dataset.duplicate_disposition || []).length,
+        verifications: (dataset.verification || []).length, needsIdentification: needs.length
+      },
+      materials: materials,
+      families: families,
+      verification: dataset.verification || [],
+      duplicate_disposition: dataset.duplicate_disposition || [],
+      scoreboard: dataset.scoreboard || null,
+      needs_identification: needs
+    };
+  }
+
   return {
-    version: '0.4.0',
+    version: '0.5.0',
     s: s, round1: round1, postingMonth: postingMonth, numOrBlank: numOrBlank,
     indexIW39: indexIW39, derive: derive, consumedByFamily: consumedByFamily,
     indexBy: indexBy, enrich: enrich,
     verdictFromPiles: verdictFromPiles, mergeVerification: mergeVerification,
-    buildScoreboard: buildScoreboard
+    buildScoreboard: buildScoreboard, assembleCanonical: assembleCanonical, SCHEMA_VERSION: SCHEMA_VERSION
   };
 });

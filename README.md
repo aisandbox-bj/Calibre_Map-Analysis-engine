@@ -31,6 +31,10 @@ Turns the field keep/retire decisions into the elimination KPI. Each **retired**
 
 Rolls up **% eliminated**, counts per state, and the on-hand units tied in retired numbers. Emits `duplicate_disposition[]` + `scoreboard{}`. (Needs INV MSTR loaded for on-hand.)
 
+## Phase 5 — one canonical dataset (the shared contract)
+`engine.assembleCanonical()` formalizes everything into ONE versioned JSON (`schemaVersion 1.0.0`) the engine emits, `build_app.py` packages, and the desktop viewer reads:
+`meta` · `counts` · `materials[]` (incl. where-used detail + disposition status) · `families[]` (field verdicts + members) · `verification[]` · `duplicate_disposition[]` · `scoreboard{}` · `needs_identification[]` (consumed materials absent from the master — candidates for the assessment tool). Export = `calibre_map_dataset_<date>.json`.
+
 ## Files
 | File | Role |
 |---|---|
@@ -40,7 +44,7 @@ Rolls up **% eliminated**, counts per state, and the on-hand units tied in retir
 | `vendor/xlsx.full.min.js` | SheetJS (vendored — offline, no CDN) |
 
 ## Roadmap (see the design doc in the Calibre Map repo)
-**Done:** Phase 1 consumption · Phase 2 enrichment · Phase 3 verification merge · Phase 4 removal scoreboard. **Next:** canonical JSON out (one dataset the app + viewer read) · quick-identify triage for new parts.
+**Done:** Phase 1 consumption · Phase 2 enrichment · Phase 3 verification merge · Phase 4 removal scoreboard · Phase 5 canonical dataset out. **Next:** the desktop viewer (reads this JSON) · quick-identify triage for new parts · testing on a real refresh.
 
 ## Data governance
 This repo is **tool code only**. `.gitignore` blocks every data format (`*.xlsx`, `*.csv`, `*.json`, `*.pdf`). Client data is loaded client-side and the derived JSON is downloaded to your machine — it never touches the repo. Same model as the public Calibre Trend / Trace tools.
