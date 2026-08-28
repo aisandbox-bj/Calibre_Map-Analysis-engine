@@ -207,11 +207,43 @@
     return sum;
   }
 
+  // ── Phase 4: removal scoreboard (duplicate_disposition) ──────────
+  // From merged field verdicts (keep/retire) + consumption + on-hand, classify
+  // each RETIRED sku and roll up the elimination KPI:
+  //   eliminated    — on-hand 0: already gone from stock
+  //   running_down  — on-hand > 0, no consumption in period: depletes cleanly (🟢)
+  //   reorder_risk  — still consumed: only retire once demand moves to the keep sku (🔴)
+  function buildScoreboard(dataset) {
+    dataset = dataset || {};
+    var byMn = {};
+    (dataset.materials || []).forEach(function (m) { byMn[String(m.material)] = m; });
+    function n(v) { var x = Number(v); return isNaN(x) ? 0 : x; }
+    var rows = [], k = { families: 0, retireSkus: 0, eliminated: 0, runningDown: 0, reorderRisk: 0, onHandInRetire: 0, provisionalFamilies: 0 };
+    (dataset.verification || []).forEach(function (v) {
+      if (!v.retire || !v.retire.length) return;
+      k.families++; if (v.provisional) k.provisionalFamilies++;
+      var keep = v.keep ? Object.keys(v.keep).map(function (p) { return v.keep[p]; }) : [];
+      v.retire.forEach(function (mn) {
+        var m = byMn[mn] || {}, oh = n(m.on_hand), net = n(m.net_consumed), status;
+        if (oh <= 0) { status = 'eliminated'; k.eliminated++; }
+        else if (net > 0) { status = 'reorder_risk'; k.reorderRisk++; k.onHandInRetire += oh; }
+        else { status = 'running_down'; k.runningDown++; k.onHandInRetire += oh; }
+        k.retireSkus++;
+        rows.push({ family_id: v.family_id, retire: mn, keep: keep, description: (m.description || ''), on_hand: oh, net_consumed: net, status: status, provisional: !!v.provisional });
+      });
+    });
+    k.pctEliminated = k.retireSkus ? Math.round(100 * k.eliminated / k.retireSkus) : 0;
+    dataset.duplicate_disposition = rows;
+    dataset.scoreboard = k;
+    return { rows: rows, kpi: k };
+  }
+
   return {
-    version: '0.3.0',
+    version: '0.4.0',
     s: s, round1: round1, postingMonth: postingMonth, numOrBlank: numOrBlank,
     indexIW39: indexIW39, derive: derive, consumedByFamily: consumedByFamily,
     indexBy: indexBy, enrich: enrich,
-    verdictFromPiles: verdictFromPiles, mergeVerification: mergeVerification
+    verdictFromPiles: verdictFromPiles, mergeVerification: mergeVerification,
+    buildScoreboard: buildScoreboard
   };
 });

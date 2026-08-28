@@ -23,6 +23,14 @@ Joins **INV MSTR** (`OnHand`, `MRP Type`, `Reorder Point`→ROP, `Maximum Stock 
 ## Phase 3 — verification merge (field → dataset)
 Folds the app's exported **capture bundles** back in. Each duplicate-family capture sorts members into piles, from which the **verdict is derived** (one pile = SAME · one pile per member = all-different · otherwise SPLIT), along with the **keep/retire** per pile, the "no technical preference" flag, site-question answers, notes and QoH corrections. Emits `verification[]` and annotates families with the field verdict. Verified on a real exported bundle (2 families → SAME + SPLIT, keep/retire correct).
 
+## Phase 4 — removal scoreboard (`duplicate_disposition`)
+Turns the field keep/retire decisions into the elimination KPI. Each **retired** SKU is classified from consumption + on-hand:
+- **eliminated** — on-hand 0: already gone from stock
+- **running-down** 🟢 — on-hand > 0, no consumption in period: depletes cleanly
+- **reorder-on-retire** 🔴 — still consumed: only retire once demand moves to the keep SKU
+
+Rolls up **% eliminated**, counts per state, and the on-hand units tied in retired numbers. Emits `duplicate_disposition[]` + `scoreboard{}`. (Needs INV MSTR loaded for on-hand.)
+
 ## Files
 | File | Role |
 |---|---|
@@ -32,7 +40,7 @@ Folds the app's exported **capture bundles** back in. Each duplicate-family capt
 | `vendor/xlsx.full.min.js` | SheetJS (vendored — offline, no CDN) |
 
 ## Roadmap (see the design doc in the Calibre Map repo)
-Phase 2 master delta + removal scoreboard · Phase 3 verification merge · Phase 4 quick-identify triage · Phase 5 full canonical JSON out.
+**Done:** Phase 1 consumption · Phase 2 enrichment · Phase 3 verification merge · Phase 4 removal scoreboard. **Next:** canonical JSON out (one dataset the app + viewer read) · quick-identify triage for new parts.
 
 ## Data governance
 This repo is **tool code only**. `.gitignore` blocks every data format (`*.xlsx`, `*.csv`, `*.json`, `*.pdf`). Client data is loaded client-side and the derived JSON is downloaded to your machine — it never touches the repo. Same model as the public Calibre Trend / Trace tools.

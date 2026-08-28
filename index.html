@@ -96,6 +96,7 @@
       <h2>2 · Results</h2>
       <div class="kpis" id="kpis"></div>
       <div id="verifBox"></div>
+      <div id="scoreBox"></div>
       <div id="validBox"></div>
     </div>
 
@@ -252,7 +253,9 @@ $('#run').addEventListener('click', async ()=>{
       const vsum = CalibreEngine.mergeVerification(derived, bundles);
       derived.meta.phase = 3;
       renderVerification(vsum);
-    } else { $('#verifBox').innerHTML = ''; }
+      const sb = CalibreEngine.buildScoreboard(derived);
+      if (sb.rows.length){ derived.meta.phase = 4; renderScoreboard(sb); } else { $('#scoreBox').innerHTML = ''; }
+    } else { $('#verifBox').innerHTML = ''; $('#scoreBox').innerHTML = ''; }
 
     renderKPIs(mats, rows, iw);
     if (files.gold) await validate(mats); else $('#validBox').innerHTML='';
@@ -278,6 +281,20 @@ function renderKPIs(mats, rows, iw){
     ['Materials seen (incl. net ≤ 0)', Object.keys(mats).length.toLocaleString()],
   ];
   $('#kpis').innerHTML = kp.map(([l,n])=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+function renderScoreboard(sb){
+  const box = $('#scoreBox'); if(!box) return; const k = sb.kpi;
+  box.innerHTML = `<div style="margin-top:14px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;padding:14px 16px">
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);margin-bottom:10px">Removal scoreboard — duplicate disposition</div>
+    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi" style="border-left-color:var(--ok)"><div class="n">${k.pctEliminated}%</div><div class="l">Eliminated</div></div>
+      <div class="kpi" style="border-left-color:var(--crit)"><div class="n">${k.reorderRisk}</div><div class="l">reorder-on-retire</div></div>
+      <div class="kpi" style="border-left-color:var(--ok)"><div class="n">${k.runningDown}</div><div class="l">running-down</div></div>
+      <div class="kpi"><div class="n">${k.retireSkus}</div><div class="l">retire SKUs · ${k.families} fam</div></div>
+    </div>
+    <div class="note" style="margin-top:8px">${k.onHandInRetire} units on-hand tied in retired numbers${k.provisionalFamilies?` · ${k.provisionalFamilies} family(ies) “no technical preference”`:''}. Needs INV MSTR loaded for on-hand accuracy.</div>
+  </div>`;
 }
 
 function renderVerification(v){
