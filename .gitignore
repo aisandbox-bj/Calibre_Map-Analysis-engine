@@ -1,0 +1,20 @@
+# ══════════════════════════════════════════════════════════════════
+#  PUBLIC tool repo — NEVER commit client data or derived output.
+#  The engine loads spreadsheets in the browser and downloads JSON
+#  locally; none of that belongs in git. Block data formats broadly.
+# ══════════════════════════════════════════════════════════════════
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.json
+!package.json
+
+/data/
+/_dev/
+/sample/
+
+.claude/
+.DS_Store
+Thumbs.db
+Desktop.ini

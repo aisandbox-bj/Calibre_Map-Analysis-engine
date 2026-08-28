@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calibre Map — Analysis Engine</title>
+<style>
+  :root{
+    --void:#0A0D1A; --deep:#040E1C; --surface:#0C2D3B; --surface2:#091F2D; --elevated:#164049;
+    --border:#1d3a44; --line:rgba(31,206,216,.14);
+    --text:#F0F4F3; --text2:#D6DFDE; --muted:#9BABA8;
+    --green:#23B58A; --green2:#5AB69D; --cyan:#1FCED8; --navy:#0C2D3B;
+    --ok:#34D399; --warn:#FBBF24; --crit:#EF4444; --violet:#9B97E8;
+    --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+    --body:'Barlow','Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--void);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.5}
+  a{color:var(--cyan)}
+  header{display:flex;align-items:center;gap:14px;padding:16px 24px;background:linear-gradient(90deg,var(--deep),var(--surface));border-bottom:1px solid var(--line)}
+  header .mark{width:34px;height:34px;flex:none}
+  header h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.3px}
+  header h1 small{display:block;font-weight:400;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--green2)}
+  .wrap{max-width:1160px;margin:0 auto;padding:22px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:18px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green);margin:0 0 14px;font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  .drop{border:1px dashed var(--border);border-radius:6px;padding:12px 14px;background:var(--surface2);transition:.15s}
+  .drop.set{border-color:var(--green);border-style:solid}
+  .drop.req label b::after{content:' *';color:var(--green)}
+  .drop label{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}
+  .drop label b{color:var(--text);font-size:13px;font-weight:600}
+  .drop input{font-size:12px;color:var(--text2);width:100%}
+  .drop .fn{font-family:var(--mono);font-size:11px;color:var(--green2);margin-top:6px;word-break:break-all;min-height:14px}
+  .btn{background:var(--green);color:#062018;border:none;border-radius:6px;padding:10px 22px;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--body)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{background:transparent;color:var(--cyan);border:1px solid var(--cyan)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .status{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:12px;min-height:16px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:6px;padding:12px 14px}
+  .kpi .n{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--text)}
+  .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:3px}
+  .valid{border-left-color:var(--muted)}
+  .valid.pass{border-left-color:var(--ok)} .valid.fail{border-left-color:var(--crit)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{background:var(--elevated);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text);cursor:pointer;position:sticky;top:0}
+  th.num,td.num{text-align:right;font-family:var(--mono)}
+  td.mn{font-family:var(--mono);color:var(--cyan)}
+  tbody tr:hover{background:rgba(31,206,216,.05)}
+  .tblwrap{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:6px}
+  .search{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:13px;width:240px}
+  .muted{color:var(--muted)} .mono{font-family:var(--mono)}
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:3px;background:rgba(31,206,216,.1);color:var(--cyan);border:1px solid var(--line)}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  details summary{cursor:pointer;color:var(--cyan);font-size:12px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <svg class="mark" viewBox="0 0 720 720" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <polygon points="660,360 510,619.8 210,619.8 60,360 210,100.2 510,100.2" fill="none" stroke="#23B58A" stroke-width="26" stroke-linejoin="round"/>
+    <g stroke="#23B58A" stroke-width="20" stroke-linecap="round"><line x1="360" y1="360" x2="360" y2="220"/><line x1="360" y1="360" x2="480" y2="430"/><line x1="360" y1="360" x2="240" y2="430"/></g>
+    <g fill="#23B58A"><circle cx="360" cy="220" r="34"/><circle cx="480" cy="430" r="28"/><circle cx="240" cy="430" r="28"/></g>
+    <circle cx="360" cy="360" r="30" fill="#0C2D3B" stroke="#23B58A" stroke-width="14"/>
+  </svg>
+  <h1>Calibre Map<small>Analysis Engine · Phase 1</small></h1>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>1 · Load the transactional feedstock</h2>
+    <div class="grid">
+      <div class="drop req" id="d_mb51"><label><b>MB51</b> — WO consumption extract (.xlsx)</label><input type="file" accept=".xlsx,.xls" id="f_mb51"><div class="fn"></div></div>
+      <div class="drop req" id="d_iw39"><label><b>IW39</b> — work-order list (.xlsx)</label><input type="file" accept=".xlsx,.xls" id="f_iw39"><div class="fn"></div></div>
+      <div class="drop" id="d_fleet"><label><b>Fleet register</b> — unit → group, optional (.csv/.xlsx)</label><input type="file" accept=".csv,.xlsx,.xls" id="f_fleet"><div class="fn"></div></div>
+      <div class="drop" id="d_gold"><label><b>Golden CSV</b> — consumption_by_unit.csv, optional self-check</label><input type="file" accept=".csv" id="f_gold"><div class="fn"></div></div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn" id="run" disabled>Run derivation</button>
+      <span class="muted" style="font-size:12px">Net consumed = material-level net of MB51 261/262, flipped; kept where net &gt; 0.</span>
+    </div>
+    <div class="status" id="status">Waiting for MB51 + IW39…</div>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="card">
+      <h2>2 · Results</h2>
+      <div class="kpis" id="kpis"></div>
+      <div id="validBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">3 · Consumption by material</h2>
+        <div class="row">
+          <input class="search" id="search" placeholder="filter material / desc…">
+          <button class="btn ghost" id="export">Export JSON</button>
+        </div>
+      </div>
+      <div class="tblwrap">
+        <table id="tbl">
+          <thead><tr>
+            <th data-k="mn">Material</th><th data-k="desc">Description</th>
+            <th data-k="net" class="num">Net consumed</th>
+            <th data-k="units" class="num">Units</th>
+            <th data-k="top">Top consuming unit</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="note" id="tblnote"></div>
+    </div>
+  </div>
+
+  <p class="note">Runs entirely in your browser — nothing is uploaded. Load client extracts locally; export the JSON and move it by USB. <span class="pill">v0.1 · engine <span id="ev"></span></span></p>
+</div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="numacore_lib.js"></script>
+<script src="engine.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const files = { mb51:null, iw39:null, fleet:null, gold:null };
+let derived = null, tableRows = [], sortK = 'net', sortDir = -1;
+document.getElementById('ev').textContent = CalibreEngine.version;
+
+function wire(id, key){
+  const inp = $('#f_'+key);
+  inp.addEventListener('change', e=>{
+    const f = e.target.files[0]; files[key]=f||null;
+    const d = $('#d_'+key); d.classList.toggle('set', !!f);
+    d.querySelector('.fn').textContent = f ? f.name : '';
+    $('#run').disabled = !(files.mb51 && files.iw39);
+    if (f) setStatus('Ready to run.');
+  });
+}
+['mb51','iw39','fleet','gold'].forEach(k=>wire(0,k));
+
+function setStatus(t){ $('#status').textContent = t; }
+
+function readXlsx(file){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>{ try{
+      const wb = XLSX.read(new Uint8Array(r.result), {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      res(XLSX.utils.sheet_to_json(ws, {defval:null}));
+    }catch(err){ rej(err); } };
+    r.onerror = ()=>rej(new Error('read failed'));
+    r.readAsArrayBuffer(file);
+  });
+}
+function readText(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error('read failed')); r.readAsText(file); }); }
+
+function parseCSV(text){
+  const out=[]; let row=[],field='',i=0,q=false;
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  while(i<text.length){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false; } else field+=c; }
+    else { if(c==='"')q=true; else if(c===','){row.push(field);field='';} else if(c==='\r'){} else if(c==='\n'){row.push(field);out.push(row);row=[];field='';} else field+=c; }
+    i++;
+  }
+  if(field.length||row.length){row.push(field);out.push(row);}
+  return out;
+}
+
+// build unit -> group label from a fleet register (Family col if present, else Make+Model)
+function fleetMap(rows){
+  const m={}; if(!rows) return m;
+  const has = k => rows[0] && Object.prototype.hasOwnProperty.call(rows[0],k);
+  rows.forEach(r=>{
+    const u = String(r['Unit']||r['Sort Field']||'').trim(); if(!u) return;
+    let g = String(r['Family']||'').trim();
+    if(!g){ g = [r['Make'],r['Model']].map(x=>String(x||'').trim()).filter(Boolean).join(' '); }
+    if(g) m[u]=g;
+  });
+  return m;
+}
+
+$('#run').addEventListener('click', async ()=>{
+  try{
+    $('#run').disabled=true; setStatus('Reading MB51 + IW39…');
+    const [mb, iwRows] = await Promise.all([ readXlsx(files.mb51), readXlsx(files.iw39) ]);
+    setStatus('Deriving…');
+    const iw = CalibreEngine.indexIW39(iwRows);
+    const mats = CalibreEngine.derive(mb, iw);
+
+    let fmap = {};
+    if (files.fleet){
+      const fr = files.fleet.name.toLowerCase().endsWith('.csv')
+        ? csvToObjects(await readText(files.fleet)) : await readXlsx(files.fleet);
+      fmap = fleetMap(fr);
+    }
+
+    // consumption_by_unit view = materials with net>0
+    const rows = [];
+    Object.keys(mats).forEach(mn=>{
+      const m = mats[mn]; if (m.netAll <= 0) return;
+      const top = m.whereUsed[0];
+      rows.push({
+        mn, net:m.netAll, units:m.whereUsed.length,
+        top: top ? (top.unit+' ('+top.qty+')') : '',
+        byUnit: m.whereUsed.map(w=>w.unit+': '+w.qty).join('; '),
+        byGroup: files.fleet ? CalibreEngine.consumedByFamily(m, fmap) : '',
+        desc: '', _m:m
+      });
+    });
+
+    derived = { meta:{ tool:'calibre-analysis-engine', phase:1, generatedFrom:{mb51:files.mb51.name, iw39:files.iw39.name}, rule:'net consumed = material-level net of MB51 261/262 flipped; net>0' },
+                materials: rows.map(r=>({ material:r.mn, net_consumed:r.net, consuming_units:r.units, consumed_by_unit:r.byUnit, consumed_by_group:r.byGroup||undefined })) };
+    tableRows = rows;
+
+    renderKPIs(mats, rows, iw);
+    if (files.gold) await validate(mats); else $('#validBox').innerHTML='';
+    sortK='net'; sortDir=-1; renderTable();
+    $('#results').classList.remove('hidden');
+    setStatus('Done — '+rows.length+' materials with net consumption.');
+  }catch(err){ setStatus('Error: '+err.message); console.error(err); }
+  finally{ $('#run').disabled=false; }
+});
+
+function csvToObjects(text){
+  const a = parseCSV(text); if(!a.length) return [];
+  const h = a[0].map(x=>String(x).trim());
+  return a.slice(1).map(r=>{ const o={}; h.forEach((k,i)=>o[k]=r[i]); return o; });
+}
+
+function renderKPIs(mats, rows, iw){
+  const totalNet = rows.reduce((s,r)=>s+r.net,0);
+  const kp = [
+    ['Materials (net &gt; 0)', rows.length.toLocaleString()],
+    ['Total net consumed', CalibreEngine.round1(totalNet).toLocaleString()],
+    ['Orders indexed (IW39)', Object.keys(iw.woUnit).length.toLocaleString()],
+    ['Materials seen (incl. net ≤ 0)', Object.keys(mats).length.toLocaleString()],
+  ];
+  $('#kpis').innerHTML = kp.map(([l,n])=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+async function validate(mats){
+  const gold = csvToObjects(await readText(files.gold));
+  let total=0, match=0, mism=0, missing=0; const ex=[];
+  gold.forEach(g=>{
+    const mn = String(g['Material']||'').trim(); if(!mn) return;
+    total++;
+    const want = parseFloat(g['Net consumed']||'0')||0;
+    if(!(mn in mats)){ missing++; return; }
+    const got = CalibreEngine.round1(mats[mn].netAll);
+    if(Math.abs(got-want)<0.5) match++;
+    else { mism++; if(ex.length<8) ex.push(`${mn}: golden ${want} vs engine ${got}`); }
+  });
+  const pass = (mism===0 && missing===0);
+  $('#validBox').innerHTML =
+    `<div class="kpi valid ${pass?'pass':'fail'}" style="margin-top:12px">
+       <div class="n">${match}/${total} <span class="muted" style="font-size:13px">match</span></div>
+       <div class="l">Self-check vs golden consumption_by_unit.csv — ${pass?'✓ exact':(mism+' mismatch · '+missing+' missing')}</div>
+       ${ex.length?`<details style="margin-top:8px"><summary>show mismatches</summary><div class="mono note">${ex.join('<br>')}</div></details>`:''}
+     </div>`;
+}
+
+function renderTable(){
+  const q = $('#search').value.trim().toLowerCase();
+  let rows = tableRows;
+  if(q) rows = rows.filter(r=> r.mn.toLowerCase().includes(q) || (r.byUnit||'').toLowerCase().includes(q));
+  rows = rows.slice().sort((a,b)=>{
+    let x=a[sortK], y=b[sortK];
+    if(typeof x==='string'){ x=x.toLowerCase(); y=(y||'').toLowerCase(); return sortDir*(x<y?-1:x>y?1:0); }
+    return sortDir*((x||0)-(y||0));
+  });
+  const cap = 500;
+  const body = rows.slice(0,cap).map(r=>`<tr>
+    <td class="mn">${r.mn}</td><td>${esc(r.desc)}</td>
+    <td class="num">${r.net}</td><td class="num">${r.units}</td><td>${esc(r.top)}</td></tr>`).join('');
+  $('#tbl tbody').innerHTML = body;
+  $('#tblnote').textContent = rows.length>cap ? `Showing top ${cap} of ${rows.length} (refine with the filter).` : `${rows.length} materials.`;
+}
+function esc(s){ return (window.NumaCoreLib&&NumaCoreLib.esc)?NumaCoreLib.esc(s):String(s==null?'':s); }
+
+$('#search').addEventListener('input', renderTable);
+document.querySelectorAll('#tbl th').forEach(th=>th.addEventListener('click',()=>{
+  const k=th.dataset.k; if(sortK===k) sortDir=-sortDir; else {sortK=k; sortDir = (k==='mn'||k==='desc'||k==='top')?1:-1;}
+  renderTable();
+}));
+
+$('#export').addEventListener('click', ()=>{
+  if(!derived) return;
+  const blob = new Blob([JSON.stringify(derived,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob); const a=document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href=url; a.download='consumption_by_unit_'+stamp+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+});
+</script>
+</body>
+</html>
