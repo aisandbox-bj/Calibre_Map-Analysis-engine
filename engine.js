@@ -150,10 +150,68 @@
     return materials;
   }
 
+  // ── Phase 3: verification merge (fold app capture bundles) ───────
+  // A field capture sorts a duplicate family's members into piles (g: mn->pile).
+  // Verdict is derived: one pile = SAME (merge), one pile per member = ALL_DIFFERENT,
+  // anything between = SPLIT (partial merge).
+  function verdictFromPiles(g) {
+    var mns = Object.keys(g || {}), piles = {};
+    mns.forEach(function (mn) { var p = String(g[mn]); (piles[p] = piles[p] || []).push(mn); });
+    var np = Object.keys(piles).length;
+    var verdict = np <= 1 ? 'SAME' : (np === mns.length ? 'ALL_DIFFERENT' : 'SPLIT');
+    return { verdict: verdict, piles: piles, members: mns.length };
+  }
+
+  // Fold one or more exported capture bundles into dataset.verification[] and
+  // annotate dataset.families (when present). Deterministic; returns a summary.
+  // A bundle is the app's exported JSON: { tech, exported, captures:{ key: cap } }.
+  function mergeVerification(dataset, bundles) {
+    dataset = dataset || {};
+    dataset.verification = dataset.verification || [];
+    var list = Array.isArray(bundles) ? bundles : [bundles];
+    var sum = { bundles: 0, captures: 0, families: 0, verdicts: { SAME: 0, SPLIT: 0, ALL_DIFFERENT: 0 }, provisional: 0, stages: {} };
+    list.forEach(function (b) {
+      if (!b || !b.captures) return;
+      sum.bundles++;
+      Object.keys(b.captures).forEach(function (key) {
+        var c = b.captures[key]; sum.captures++;
+        var mtc = key.match(/^s(\d+)([a-z]*):(.+)$/i);   // e.g. "s1f:F011", "s2:1008199"
+        var stage = mtc ? mtc[1] : '?', id = mtc ? mtc[3] : key;
+        sum.stages[stage] = (sum.stages[stage] || 0) + 1;
+        var rec = {
+          stage: stage, family_id: id, key: key,
+          tech: b.tech || c.tech || '', ts: c.ts || b.exported || '',
+          finding: c.finding || '', site_answer: c.sqA || '',
+          notes: c.mnotes || {}, qoh: c.qoh || {}
+        };
+        if (c.g) {
+          var v = verdictFromPiles(c.g);
+          rec.verdict = v.verdict; rec.piles = v.piles; rec.members = v.members;
+          rec.keep = c.keep || {}; rec.provisional = !!c.keepProvisional;
+          rec.retire = [];   // in-stock members not chosen as keep within their pile
+          Object.keys(v.piles).forEach(function (p) {
+            var kept = rec.keep[p];
+            v.piles[p].forEach(function (mn) { if (kept && mn !== kept) rec.retire.push(mn); });
+          });
+          if (sum.verdicts[v.verdict] != null) sum.verdicts[v.verdict]++;
+          if (rec.provisional) sum.provisional++;
+          sum.families++;
+          if (dataset.families && dataset.families.find) {
+            var fam = dataset.families.find(function (f) { return f.family_id === id; });
+            if (fam) { fam.field_verdict = v.verdict; fam.field_keep = rec.keep; fam.field_retire = rec.retire; fam.field_provisional = rec.provisional; fam.field_tech = rec.tech; }
+          }
+        }
+        dataset.verification.push(rec);
+      });
+    });
+    return sum;
+  }
+
   return {
-    version: '0.2.0',
+    version: '0.3.0',
     s: s, round1: round1, postingMonth: postingMonth, numOrBlank: numOrBlank,
     indexIW39: indexIW39, derive: derive, consumedByFamily: consumedByFamily,
-    indexBy: indexBy, enrich: enrich
+    indexBy: indexBy, enrich: enrich,
+    verdictFromPiles: verdictFromPiles, mergeVerification: mergeVerification
   };
 });

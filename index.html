@@ -80,6 +80,7 @@
       <div class="drop req" id="d_iw39"><label><b>IW39</b> — work-order list (.xlsx)</label><input type="file" accept=".xlsx,.xls" id="f_iw39"><div class="fn"></div></div>
       <div class="drop" id="d_invmstr"><label><b>INV MSTR</b> — inventory master, optional (.xlsx) · on-hand, MRP, ROP, Max</label><input type="file" accept=".xlsx,.xls" id="f_invmstr"><div class="fn"></div></div>
       <div class="drop" id="d_master"><label><b>Master / traced register</b> — optional (.csv) · description, brand, dup group</label><input type="file" accept=".csv,.xlsx,.xls" id="f_master"><div class="fn"></div></div>
+      <div class="drop" id="d_captures"><label><b>Field captures</b> — exported bundles, optional (.json, multiple)</label><input type="file" accept=".json" id="f_captures" multiple><div class="fn"></div></div>
       <div class="drop" id="d_fleet"><label><b>Fleet register</b> — unit → group, optional (.csv/.xlsx)</label><input type="file" accept=".csv,.xlsx,.xls" id="f_fleet"><div class="fn"></div></div>
       <div class="drop" id="d_gold"><label><b>Golden CSV</b> — consumption_by_unit.csv, optional self-check</label><input type="file" accept=".csv" id="f_gold"><div class="fn"></div></div>
     </div>
@@ -94,6 +95,7 @@
     <div class="card">
       <h2>2 · Results</h2>
       <div class="kpis" id="kpis"></div>
+      <div id="verifBox"></div>
       <div id="validBox"></div>
     </div>
 
@@ -130,21 +132,23 @@
 <script src="engine.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-const files = { mb51:null, iw39:null, invmstr:null, master:null, fleet:null, gold:null };
+const files = { mb51:null, iw39:null, invmstr:null, master:null, captures:null, fleet:null, gold:null };
 let derived = null, tableRows = [], sortK = 'net', sortDir = -1;
 document.getElementById('ev').textContent = CalibreEngine.version;
 
 function wire(id, key){
   const inp = $('#f_'+key);
   inp.addEventListener('change', e=>{
-    const f = e.target.files[0]; files[key]=f||null;
-    const d = $('#d_'+key); d.classList.toggle('set', !!f);
-    d.querySelector('.fn').textContent = f ? f.name : '';
+    const fl = e.target.files;
+    if (inp.multiple){ files[key] = [...fl]; } else { files[key] = fl[0]||null; }
+    const has = inp.multiple ? files[key].length : !!files[key];
+    const d = $('#d_'+key); d.classList.toggle('set', !!has);
+    d.querySelector('.fn').textContent = inp.multiple ? (has? has+' file(s)':'') : (files[key]? files[key].name : '');
     $('#run').disabled = !(files.mb51 && files.iw39);
-    if (f) setStatus('Ready to run.');
+    if (has) setStatus('Ready to run.');
   });
 }
-['mb51','iw39','invmstr','master','fleet','gold'].forEach(k=>wire(0,k));
+['mb51','iw39','invmstr','master','captures','fleet','gold'].forEach(k=>wire(0,k));
 
 function setStatus(t){ $('#status').textContent = t; }
 
@@ -240,6 +244,16 @@ $('#run').addEventListener('click', async ()=>{
                   consuming_units:r.units, consumed_by_unit:r.byUnit, consumed_by_group:r.byGroup||undefined }; }) };
     tableRows = rows;
 
+    // Phase 3 — fold in field capture bundles (optional)
+    if (files.captures && files.captures.length){
+      setStatus('Merging field captures…');
+      const bundles = [];
+      for (const cf of files.captures){ try { bundles.push(JSON.parse(await readText(cf))); } catch(e){ console.warn('bad bundle', cf.name, e); } }
+      const vsum = CalibreEngine.mergeVerification(derived, bundles);
+      derived.meta.phase = 3;
+      renderVerification(vsum);
+    } else { $('#verifBox').innerHTML = ''; }
+
     renderKPIs(mats, rows, iw);
     if (files.gold) await validate(mats); else $('#validBox').innerHTML='';
     sortK='net'; sortDir=-1; renderTable();
@@ -264,6 +278,14 @@ function renderKPIs(mats, rows, iw){
     ['Materials seen (incl. net ≤ 0)', Object.keys(mats).length.toLocaleString()],
   ];
   $('#kpis').innerHTML = kp.map(([l,n])=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+function renderVerification(v){
+  const box = $('#verifBox'); if(!box) return;
+  box.innerHTML = `<div class="kpi valid pass" style="margin-top:12px;border-left-color:var(--core)">
+    <div class="n">${v.families} <span class="muted" style="font-size:13px">families field-verified</span></div>
+    <div class="l">Captures merged — ${v.verdicts.SAME} same · ${v.verdicts.SPLIT} split · ${v.verdicts.ALL_DIFFERENT} all-different · ${v.provisional} “no tech preference” · ${v.captures} record(s) from ${v.bundles} bundle(s)</div>
+  </div>`;
 }
 
 async function validate(mats){

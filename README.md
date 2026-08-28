@@ -7,7 +7,7 @@ A **public, client-side, deterministic** browser tool that keeps the Calibre Map
 ## Use it
 Open `index.html` (double-click, or serve the folder / GitHub Pages), then:
 1. Load **MB51** (WO consumption extract) and **IW39** (work-order list) — required.
-2. Optionally load **INV MSTR** (on-hand, MRP type, ROP, Max) and the **traced/master register** (description, brand, duplicate group) to enrich; a **fleet register** for the consuming-group roll-up; and the committed **`consumption_by_unit.csv`** to self-check.
+2. Optionally load **INV MSTR** (on-hand, MRP type, ROP, Max) and the **traced/master register** (description, brand, duplicate group) to enrich; a **fleet register** for the consuming-group roll-up; exported **field capture bundles** (`.json`, multiple) to fold in technician verdicts; and the committed **`consumption_by_unit.csv`** to self-check.
 3. **Run derivation** → review the table → **Export JSON**.
 
 Move the exported JSON to the device by USB.
@@ -19,6 +19,9 @@ Move the exported JSON to the device by USB.
 
 ## Phase 2 — enrichment (validated)
 Joins **INV MSTR** (`OnHand`, `MRP Type`, `Reorder Point`→ROP, `Maximum Stock Level`→Max) and the **traced register** (`Trace brand`, `Group label`→duplicate group) onto each material — reproducing the full `consumption_by_unit.csv` columns. Self-check: all eight enriched columns (Description, PN, OnHand, MRP Type, ROP, Max, Traced brand, Duplicate group) match the golden **1428 / 1428 exactly**.
+
+## Phase 3 — verification merge (field → dataset)
+Folds the app's exported **capture bundles** back in. Each duplicate-family capture sorts members into piles, from which the **verdict is derived** (one pile = SAME · one pile per member = all-different · otherwise SPLIT), along with the **keep/retire** per pile, the "no technical preference" flag, site-question answers, notes and QoH corrections. Emits `verification[]` and annotates families with the field verdict. Verified on a real exported bundle (2 families → SAME + SPLIT, keep/retire correct).
 
 ## Files
 | File | Role |
