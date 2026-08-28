@@ -117,9 +117,43 @@
       .join('; ');
   }
 
+  // ── Phase 2: master/inventory enrichment ─────────────────────────
+  function numOrBlank(v) {
+    if (v == null || v === '') return '';
+    var n = Number(v); return isNaN(n) ? '' : n;
+  }
+  // Index an array of row objects by a key column -> { key: row } (first wins).
+  function indexBy(rows, keyCol) {
+    var m = {};
+    (rows || []).forEach(function (r) { var k = s(r[keyCol]); if (k && !(k in m)) m[k] = r; });
+    return m;
+  }
+  // Attach the golden consumption_by_unit columns from INV MSTR + traced register.
+  // opts.invByMat  = indexBy(INV MSTR rows, 'Material')
+  // opts.tracedByMat = indexBy(traced_register rows, 'Material')
+  // Mutates and returns `materials`.
+  function enrich(materials, opts) {
+    opts = opts || {};
+    var inv = opts.invByMat || {}, tr = opts.tracedByMat || {};
+    Object.keys(materials).forEach(function (mn) {
+      var m = materials[mn], i = inv[mn] || {}, t = tr[mn] || {};
+      m.description  = s(i['Material Description']) || s(t['Description']) || '';
+      m.pn           = s(i['Manufacturer Part No.']) || s(t['PN']) || '';
+      m.onHand       = numOrBlank(i['OnHand']);
+      m.mrpType      = s(i['MRP Type']);
+      m.rop          = numOrBlank(i['Reorder Point']);
+      m.max          = numOrBlank(i['Maximum Stock Level']);
+      m.tracedBrand  = s(t['Trace brand']);
+      m.dupGroupId   = s(t['Duplicate group']);
+      m.dupGroup     = s(t['Group label']);   // golden shows the human label, not the id
+    });
+    return materials;
+  }
+
   return {
-    version: '0.1.0',
-    s: s, round1: round1, postingMonth: postingMonth,
-    indexIW39: indexIW39, derive: derive, consumedByFamily: consumedByFamily
+    version: '0.2.0',
+    s: s, round1: round1, postingMonth: postingMonth, numOrBlank: numOrBlank,
+    indexIW39: indexIW39, derive: derive, consumedByFamily: consumedByFamily,
+    indexBy: indexBy, enrich: enrich
   };
 });

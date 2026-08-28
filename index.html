@@ -78,6 +78,8 @@
     <div class="grid">
       <div class="drop req" id="d_mb51"><label><b>MB51</b> — WO consumption extract (.xlsx)</label><input type="file" accept=".xlsx,.xls" id="f_mb51"><div class="fn"></div></div>
       <div class="drop req" id="d_iw39"><label><b>IW39</b> — work-order list (.xlsx)</label><input type="file" accept=".xlsx,.xls" id="f_iw39"><div class="fn"></div></div>
+      <div class="drop" id="d_invmstr"><label><b>INV MSTR</b> — inventory master, optional (.xlsx) · on-hand, MRP, ROP, Max</label><input type="file" accept=".xlsx,.xls" id="f_invmstr"><div class="fn"></div></div>
+      <div class="drop" id="d_master"><label><b>Master / traced register</b> — optional (.csv) · description, brand, dup group</label><input type="file" accept=".csv,.xlsx,.xls" id="f_master"><div class="fn"></div></div>
       <div class="drop" id="d_fleet"><label><b>Fleet register</b> — unit → group, optional (.csv/.xlsx)</label><input type="file" accept=".csv,.xlsx,.xls" id="f_fleet"><div class="fn"></div></div>
       <div class="drop" id="d_gold"><label><b>Golden CSV</b> — consumption_by_unit.csv, optional self-check</label><input type="file" accept=".csv" id="f_gold"><div class="fn"></div></div>
     </div>
@@ -108,8 +110,10 @@
           <thead><tr>
             <th data-k="mn">Material</th><th data-k="desc">Description</th>
             <th data-k="net" class="num">Net consumed</th>
+            <th data-k="onHand" class="num">On hand</th>
+            <th data-k="mrp">MRP</th>
             <th data-k="units" class="num">Units</th>
-            <th data-k="top">Top consuming unit</th>
+            <th data-k="dup">Dup group</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -126,7 +130,7 @@
 <script src="engine.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-const files = { mb51:null, iw39:null, fleet:null, gold:null };
+const files = { mb51:null, iw39:null, invmstr:null, master:null, fleet:null, gold:null };
 let derived = null, tableRows = [], sortK = 'net', sortDir = -1;
 document.getElementById('ev').textContent = CalibreEngine.version;
 
@@ -140,7 +144,7 @@ function wire(id, key){
     if (f) setStatus('Ready to run.');
   });
 }
-['mb51','iw39','fleet','gold'].forEach(k=>wire(0,k));
+['mb51','iw39','invmstr','master','fleet','gold'].forEach(k=>wire(0,k));
 
 function setStatus(t){ $('#status').textContent = t; }
 
@@ -191,6 +195,18 @@ $('#run').addEventListener('click', async ()=>{
     const iw = CalibreEngine.indexIW39(iwRows);
     const mats = CalibreEngine.derive(mb, iw);
 
+    // Phase 2 — enrich with inventory master + traced register (optional)
+    if (files.invmstr || files.master){
+      setStatus('Enriching (INV MSTR / master)…');
+      const invBy = files.invmstr ? CalibreEngine.indexBy(await readXlsx(files.invmstr), 'Material') : {};
+      let trBy = {};
+      if (files.master){
+        const mr = files.master.name.toLowerCase().endsWith('.csv') ? csvToObjects(await readText(files.master)) : await readXlsx(files.master);
+        trBy = CalibreEngine.indexBy(mr, 'Material');
+      }
+      CalibreEngine.enrich(mats, { invByMat: invBy, tracedByMat: trBy });
+    }
+
     let fmap = {};
     if (files.fleet){
       const fr = files.fleet.name.toLowerCase().endsWith('.csv')
@@ -205,15 +221,23 @@ $('#run').addEventListener('click', async ()=>{
       const top = m.whereUsed[0];
       rows.push({
         mn, net:m.netAll, units:m.whereUsed.length,
+        onHand: m.onHand===''||m.onHand==null ? '' : m.onHand,
+        mrp: m.mrpType||'', dup: m.dupGroup||'',
         top: top ? (top.unit+' ('+top.qty+')') : '',
         byUnit: m.whereUsed.map(w=>w.unit+': '+w.qty).join('; '),
         byGroup: files.fleet ? CalibreEngine.consumedByFamily(m, fmap) : '',
-        desc: '', _m:m
+        desc: m.description||'', _m:m
       });
     });
 
-    derived = { meta:{ tool:'calibre-analysis-engine', phase:1, generatedFrom:{mb51:files.mb51.name, iw39:files.iw39.name}, rule:'net consumed = material-level net of MB51 261/262 flipped; net>0' },
-                materials: rows.map(r=>({ material:r.mn, net_consumed:r.net, consuming_units:r.units, consumed_by_unit:r.byUnit, consumed_by_group:r.byGroup||undefined })) };
+    const enriched = !!(files.invmstr || files.master);
+    derived = { meta:{ tool:'calibre-analysis-engine', phase: enriched?2:1, generatedFrom:{mb51:files.mb51.name, iw39:files.iw39.name}, rule:'net consumed = material-level net of MB51 261/262 flipped; net>0' },
+                materials: rows.map(r=>{ const m=r._m; return {
+                  material:r.mn, description:r.desc||undefined, pn:m.pn||undefined,
+                  net_consumed:r.net, on_hand: enriched?m.onHand:undefined,
+                  mrp_type:m.mrpType||undefined, rop: enriched?m.rop:undefined, max: enriched?m.max:undefined,
+                  traced_brand:m.tracedBrand||undefined, duplicate_group:m.dupGroup||undefined,
+                  consuming_units:r.units, consumed_by_unit:r.byUnit, consumed_by_group:r.byGroup||undefined }; }) };
     tableRows = rows;
 
     renderKPIs(mats, rows, iw);
@@ -275,7 +299,8 @@ function renderTable(){
   const cap = 500;
   const body = rows.slice(0,cap).map(r=>`<tr>
     <td class="mn">${r.mn}</td><td>${esc(r.desc)}</td>
-    <td class="num">${r.net}</td><td class="num">${r.units}</td><td>${esc(r.top)}</td></tr>`).join('');
+    <td class="num">${r.net}</td><td class="num">${r.onHand}</td><td class="mono">${esc(r.mrp)}</td>
+    <td class="num">${r.units}</td><td>${esc(r.dup)}</td></tr>`).join('');
   $('#tbl tbody').innerHTML = body;
   $('#tblnote').textContent = rows.length>cap ? `Showing top ${cap} of ${rows.length} (refine with the filter).` : `${rows.length} materials.`;
 }
