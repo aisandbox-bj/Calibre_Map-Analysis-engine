@@ -2,260 +2,702 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Calibre Map — Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --void:#0A0D1A; --deep:#04101d; --surface:#0c1622; --surface2:#0a1420; --chrome:#14161D; --border:#22303a;
-    --text:#E8E9ED; --text2:#D6DFDE; --muted:#9aa7b4; --dim:#63776f; --line:rgba(31,206,216,.14);
-    --green:#23B58A; --greenb:#3FE0AE; --map:#378ADD; --amber:#E7B45B; --violet:#9B97E8;
-    --ok:#34D399; --warn:#FBBF24; --crit:#EF4444;
-    --mono:'JetBrains Mono',ui-monospace,Consolas,monospace; --body:'Barlow','Segoe UI',system-ui,sans-serif;
-    --disp:'Barlow Condensed','Arial Narrow',sans-serif; --head:'Rajdhani','Segoe UI',sans-serif;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:var(--void);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.5;min-height:100vh}
-  a{color:var(--map)}
-  header{display:flex;align-items:center;gap:13px;padding:14px 22px;background:linear-gradient(90deg,var(--deep),var(--surface));border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
-  header .mark{width:30px;height:30px;flex:none;filter:drop-shadow(0 0 5px rgba(35,181,160,.5))}
-  header h1{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:.12em}
-  header h1 i{font-style:normal;color:var(--greenb)}
-  header h1 small{font-family:var(--mono);font-weight:400;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-left:8px}
-  header .sp{flex:1}
-  .btn{background:var(--green);color:#062018;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--body)}
-  .btn.ghost{background:transparent;color:var(--greenb);border:1px solid rgba(63,201,160,.4)}
-  .meta{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.04em}
-  nav.tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:59px;z-index:19;overflow-x:auto}
-  nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--head);font-weight:600;font-size:14px;padding:12px 16px;cursor:pointer;white-space:nowrap}
-  nav.tabs button.on{color:var(--greenb);border-bottom-color:var(--green)}
-  .wrap{max-width:1200px;margin:0 auto;padding:22px}
-  /* drop / empty */
-  .drop{max-width:640px;margin:60px auto;border:2px dashed var(--border);border-radius:16px;padding:56px 30px;text-align:center;background:var(--surface2)}
-  .drop.over{border-color:var(--green);background:rgba(35,181,138,.06)}
-  .drop svg{width:56px;height:56px;margin-bottom:18px;opacity:.85}
-  .drop h2{font-family:var(--disp);font-size:26px;text-transform:uppercase;letter-spacing:.02em;margin-bottom:8px}
-  .drop p{color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.6}
-  .drop .mono{font-family:var(--mono);font-size:12px;color:var(--dim)}
-  /* kpis */
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
-  .kpi{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:10px;padding:14px 16px}
-  .kpi .n{font-family:var(--disp);font-size:30px;font-weight:700;line-height:1}
-  .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:5px}
-  .kpi.amber{border-left-color:var(--amber)} .kpi.amber .n{color:var(--amber)}
-  .kpi.crit{border-left-color:var(--crit)} .kpi.crit .n{color:var(--crit)}
-  .kpi.ok{border-left-color:var(--ok)} .kpi.ok .n{color:var(--ok)}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px}
-  .card h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--greenb);margin-bottom:14px;font-weight:500}
-  .bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin:6px 0 10px}
-  .bar span{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#04121f;font-weight:500;min-width:0}
-  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
-  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-  .search{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--mono);font-size:13px;width:280px;max-width:100%}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border)}
-  th{background:var(--chrome);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text);cursor:pointer;position:sticky;top:107px}
-  th.num,td.num{text-align:right;font-family:var(--mono)}
-  td.mn{font-family:var(--mono);color:var(--map);cursor:pointer}
-  tbody tr:hover{background:rgba(55,138,221,.06)}
-  .tblwrap{max-height:64vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
-  .pill{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
-  .pill.elim{color:var(--dim);border-color:var(--dim)}
-  .pill.run{color:var(--ok);border-color:rgba(52,211,153,.5)}
-  .pill.risk{color:var(--crit);border-color:rgba(239,68,68,.5)}
-  .pill.same{color:var(--ok);border-color:rgba(52,211,153,.5)}
-  .pill.split{color:var(--warn);border-color:rgba(251,191,36,.5)}
-  .pill.prov{color:var(--violet);border-color:rgba(155,151,232,.5)}
-  .note{font-size:12px;color:var(--muted);margin-top:8px}
-  .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
-  .fam{background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:15px 17px}
-  .fam .fh{display:flex;align-items:center;gap:9px;margin-bottom:10px}
-  .fam .fid{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:.04em}
-  .memb{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-family:var(--mono);font-size:12px;border-top:1px dashed var(--border)}
-  .memb .keep{color:var(--ok)} .memb .ret{color:var(--crit)}
-  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,92vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-20px 0 60px rgba(0,0,0,.5);transform:translateX(100%);transition:transform .22s;z-index:40;overflow-y:auto;padding:22px}
-  .drawer.open{transform:translateX(0)}
-  .drawer .x{position:absolute;top:14px;right:16px;background:var(--chrome);border:1px solid var(--border);color:var(--text);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:16px}
-  .drawer h2{font-family:var(--disp);font-size:26px;letter-spacing:.02em}
-  .kv{display:grid;grid-template-columns:120px 1fr;gap:5px 12px;font-size:13px;margin:12px 0}
-  .kv .k{color:var(--dim);text-transform:uppercase;font-size:11px;font-family:var(--head);font-weight:600;letter-spacing:.04em}
-  .kv .v{color:var(--text)} .kv .v.mono{font-family:var(--mono);font-size:12.5px}
-  .wu{margin-top:6px}
-  .wu .u{border-top:1px solid var(--border);padding:8px 0}
-  .wu .uh{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12.5px}
-  .wu .uh b{color:var(--greenb)}
-  .wu .wos{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
-  .hidden{display:none}
-  @media(max-width:640px){ .wrap{padding:14px} th{top:99px} .kpi .n{font-size:24px} }
+/* ═══════════════════════════════════════════════════════════════════════════
+   Calibre Map · Viewer — desktop/tablet sibling of the field app.
+   Layout, skin and flow mirror the Calibre Map Companion app (v2.00 design
+   system): 4-tile home, per-mode accents, green brand chrome, screen nav.
+   Self-contained single file (moves by USB). Reads the canonical dataset the
+   Analysis Engine exports; read-only.
+═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  --void:#0A0D1A; --deep:#04101d; --surface:#080C14; --chrome:#14161D; --border:#2A2D3A;
+  --text:#E8E9ED; --text-m:#8B8FA3; --text-d:#5C6078;
+  --verify:#BA7517; --verify-t:#E0A94A; --map:#378ADD; --map-t:#5AA2EA; --equip:#1D9E75; --equip-t:#2FBE8E; --core:#9B97E8;
+  --ok:#34D399; --warn:#FBBF24; --crit:#EF4444;
+  --f-disp:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --f-head:'Rajdhani','Segoe UI',Arial,sans-serif;
+  --f-body:'Barlow','Segoe UI',Arial,sans-serif;
+  --f-mono:'JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--f-body);background:var(--void);color:var(--text);min-height:100vh;font-size:15px;font-weight:400}
+a{color:var(--map);text-decoration:none}
+
+/* ── header ── */
+header{position:sticky;top:0;z-index:50;background:rgba(4,16,29,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px}
+header .logo{display:flex;align-items:center;gap:9px;cursor:pointer}
+header .cvmark{width:26px;height:26px;flex:none;filter:drop-shadow(0 0 5px rgba(35,181,160,.5))}
+header .wm{font-family:var(--f-disp);font-weight:700;font-size:18px;letter-spacing:.15em;line-height:1;display:inline-flex;align-items:baseline}
+header .wm b{color:var(--text);font-weight:700}
+header .wm i{font-style:normal;font-weight:700;margin-left:.34em;background:linear-gradient(90deg,#3FE0AE,#1C946E);-webkit-background-clip:text;background-clip:text;color:transparent}
+header .crumb{font-family:var(--f-mono);font-size:10.5px;color:var(--text-d);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;letter-spacing:.04em}
+header .saveind{font-family:var(--f-mono);font-size:9.5px;color:var(--text-d);white-space:nowrap}
+header button{background:var(--chrome);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px;font-family:var(--f-head);font-weight:600;cursor:pointer;min-height:38px;transition:border-color .15s}
+header button:hover{border-color:var(--text-d)}
+header .navlink{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-d);padding:8px 10px;border:1px solid transparent;border-radius:8px}
+header .navlink:hover{color:var(--map);border-color:var(--border)}
+
+main{padding:16px;max-width:960px;margin:0 auto;padding-bottom:80px}
+h2{font-family:var(--f-disp);font-size:30px;margin:6px 0 14px;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+h3{font-family:var(--f-head);font-size:14px;margin:16px 0 8px;color:var(--text-m);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.eyebrow-mono{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-d)}
+.note{font-size:12px;color:var(--text-d);line-height:1.55;margin:8px 0}
+.muted{color:var(--text-m)}
+
+/* ── home: mode cards ── */
+.modes{display:grid;gap:12px;margin-top:10px}
+@media(min-width:640px){.modes{grid-template-columns:1fr 1fr}}
+.modecard{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 18px;cursor:pointer;transition:border-color .15s,transform .15s}
+.modecard:hover{transform:translateY(-2px)}
+.modecard .eyebrow{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.65;margin-bottom:6px}
+.modecard .name{font-family:var(--f-disp);font-size:24px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;margin-bottom:6px}
+.modecard .desc{font-size:13px;color:var(--text-m);line-height:1.5}
+.modecard .glow{position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;filter:blur(48px);opacity:.18}
+.mc-verify{border-color:rgba(186,117,23,.3)} .mc-verify:hover{border-color:var(--verify)} .mc-verify .name,.mc-verify .eyebrow{color:var(--verify-t)} .mc-verify .glow{background:var(--verify)}
+.mc-map{border-color:rgba(55,138,221,.3)} .mc-map:hover{border-color:var(--map)} .mc-map .name,.mc-map .eyebrow{color:var(--map)} .mc-map .glow{background:var(--map)}
+.mc-equip{border-color:rgba(29,158,117,.3)} .mc-equip:hover{border-color:var(--equip)} .mc-equip .name,.mc-equip .eyebrow{color:var(--equip-t)} .mc-equip .glow{background:var(--equip)}
+.mc-data{border-color:rgba(155,151,232,.3)} .mc-data:hover{border-color:var(--core)} .mc-data .name,.mc-data .eyebrow{color:var(--core)} .mc-data .glow{background:var(--core)}
+
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:16px 0}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.stat .n{font-family:var(--f-disp);font-size:26px;font-weight:700;line-height:1}
+.stat .l{font-size:10px;color:var(--text-d);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+/* ── load / empty ── */
+.loadhero{border:2px dashed var(--border);border-radius:16px;padding:48px 30px;text-align:center;background:var(--surface);position:relative;overflow:hidden;transition:border-color .15s,background .15s}
+.loadhero.over{border-color:var(--map);background:rgba(55,138,221,.06)}
+.loadhero svg{width:52px;height:52px;margin-bottom:16px;color:var(--map)}
+.loadhero h2{margin-bottom:8px}
+.loadhero p{color:var(--text-m);font-size:13.5px;margin-bottom:20px;line-height:1.6}
+
+/* ── folder tabs (Parts Mapping) ── */
+.ftabs{display:flex;gap:6px;padding:0 2px;position:relative;z-index:2}
+.ftab{display:flex;align-items:center;gap:8px;padding:11px 18px 12px;border:1px solid var(--border);border-radius:11px 11px 0 0;font-family:var(--f-head);font-weight:600;font-size:14px;letter-spacing:.03em;cursor:pointer;color:var(--text-d);background:#05101c;transition:color .15s}
+.ftab svg{width:15px;height:15px}
+.ftab.on{color:var(--map);background:var(--void);border-bottom-color:var(--void);margin-bottom:-1px;font-weight:700}
+.fpanel{border:1px solid var(--border);border-radius:0 12px 12px 12px;background:var(--void);padding:16px 14px}
+
+.search{width:100%;background:var(--surface);border:1px solid rgba(55,138,221,.45);border-radius:12px;color:var(--text);padding:14px;font-size:16px;outline:none;margin-bottom:12px;font-family:var(--f-mono);transition:box-shadow .15s}
+.search:focus{border-color:var(--map);box-shadow:0 0 0 4px rgba(55,138,221,.12)}
+
+.list{display:flex;flex-direction:column;gap:8px}
+.row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;gap:12px;align-items:center;transition:border-color .15s}
+.row:hover{border-color:var(--map)}
+.row .t{font-weight:600;font-size:15px}
+.row .t .sap{color:var(--text-d);font-weight:400;font-family:var(--f-mono);font-size:12.5px}
+.row .t b{color:var(--map);font-weight:600}
+.row .s{font-size:12.5px;color:var(--text-m);margin-top:3px;line-height:1.45}
+.row .badges{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-family:var(--f-mono);font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);color:var(--text-m);text-transform:uppercase;letter-spacing:.04em}
+.b-dup{border-color:rgba(239,68,68,.5);color:var(--crit)}
+.b-oh{border-color:rgba(52,211,153,.4);color:var(--ok)}
+.b-net{border-color:rgba(55,138,221,.4);color:var(--map)}
+.b-mrp{border-color:rgba(155,151,232,.4);color:var(--core)}
+.b-same{border-color:rgba(52,211,153,.5);color:var(--ok)}
+.b-split{border-color:rgba(251,191,36,.5);color:var(--warn)}
+.tic{width:38px;height:38px;border-radius:10px;background:rgba(55,138,221,.10);border:1px solid rgba(55,138,221,.35);display:grid;place-items:center;color:var(--map);flex:none}
+.tic svg{width:18px;height:18px}
+/* ── system/sub-system tiles (fleet drill) ── */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:520px){.tiles{grid-template-columns:1fr}}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;display:flex;align-items:center;gap:12px;min-height:64px;transition:border-color .15s}
+.tile:hover{border-color:var(--map)}
+.tile .tn{font-family:var(--f-head);font-weight:600;font-size:14.5px;line-height:1.25;color:var(--text)}
+.tile .tc{font-family:var(--f-mono);font-size:10.5px;color:var(--text-d);margin-top:2px}
+.tile.zero{opacity:.5}
+.tile.consumed .tic{background:rgba(35,181,138,.10);border-color:rgba(35,181,138,.35);color:var(--accent-glow)}
+.chev{margin-left:auto;color:var(--text-d);flex:none}
+.chev svg{width:18px;height:18px}
+
+/* ── part / unit detail ── */
+.hero{border:1px solid var(--border);border-left:4px solid var(--map);background:linear-gradient(90deg,rgba(55,138,221,.10),var(--surface));border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 6px 22px rgba(0,0,0,.35)}
+.hero .pn{font-family:var(--f-disp);font-size:30px;font-weight:700;letter-spacing:.02em;overflow-wrap:anywhere}
+.hero .dl{font-size:13px;color:var(--text-m);margin-top:4px}
+.factgrid{display:grid;gap:12px;margin-bottom:14px}
+@media(min-width:640px){.factgrid{grid-template-columns:1fr 1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px}
+.card .fh{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px;color:var(--map)}
+.kv{display:grid;grid-template-columns:118px 1fr;gap:7px 12px;font-size:13px}
+.kv .k{font-family:var(--f-mono);color:var(--text-d);text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;padding-top:2px}
+.kv .v{color:var(--text)} .kv .v b{color:var(--text)}
+.kv .ref{color:var(--core);font-weight:600;font-family:var(--f-mono);font-size:12.5px}
+.warnbox{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-left:3px solid var(--crit);border-radius:10px;padding:12px 14px;font-size:13px;color:#f7b3b3;margin-bottom:14px}
+.warnbox b{color:#ffd2d2}
+.okbox{background:rgba(29,158,117,.08);border:1px solid rgba(29,158,117,.3);border-left:3px solid var(--equip);border-radius:10px;padding:12px 14px;font-size:13px;color:#bfe6d6;margin-bottom:14px}
+.dupmemb{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:8px 0;border-top:1px dashed var(--border);cursor:pointer}
+.dupmemb:hover .dupmn{color:var(--map-t)}
+.dupmemb .dupmn{font-family:var(--f-mono);font-size:12.5px;color:var(--map);font-weight:500}
+.dupmemb .dupid{font-size:12px;color:var(--text-m)}
+.dupmemb .dupoh{font-family:var(--f-mono);font-size:11px;color:var(--text-d);white-space:nowrap}
+.dupmemb .keep{color:var(--ok)} .dupmemb .ret{color:var(--crit)}
+.wu .u{border-top:1px solid var(--border);padding:9px 0}
+.wu .uh{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:12.5px}
+.wu .uh b{color:var(--map)}
+.wu .wos{font-size:11px;color:var(--text-m);margin-top:3px;font-family:var(--f-mono)}
+
+/* ── buttons ── */
+.primary{width:100%;min-height:48px;background:var(--map);color:#06121f;border:none;border-radius:12px;font-family:var(--f-head);font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;transition:filter .15s}
+.primary:hover{filter:brightness(1.1)}
+.primary.equip{background:var(--equip)} .primary.core{background:var(--core)}
+.ghost{width:100%;min-height:44px;background:transparent;border:1px solid var(--border);border-radius:12px;color:var(--text-m);font-family:var(--f-head);font-weight:600;font-size:13px;cursor:pointer;margin-top:8px;transition:border-color .15s}
+.ghost:hover{border-color:var(--text-d);color:var(--text)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+.btnrow .ghost,.btnrow .primary{flex:1;min-width:150px}
+
+/* ── families / candidate cards ── */
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.fam{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--verify);border-radius:12px;padding:15px 17px}
+.fam.cand{border-top-color:var(--warn)}
+.fam .fh{display:flex;align-items:center;gap:9px;margin-bottom:10px;flex-wrap:wrap}
+.fam .fid{font-family:var(--f-disp);font-size:20px;font-weight:700;letter-spacing:.04em}
+.fam .fid.sm{font-size:15px;font-family:var(--f-head);letter-spacing:.02em}
+.memb{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-family:var(--f-mono);font-size:12px;border-top:1px dashed var(--border);cursor:pointer}
+.memb:hover span:first-child{color:var(--map-t)}
+.memb .mnm{color:var(--map)} .memb .keep{color:var(--ok)} .memb .ret{color:var(--crit)}
+.pillv{display:inline-block;font-family:var(--f-mono);font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
+.pillv.same{color:var(--ok);border-color:rgba(52,211,153,.5)}
+.pillv.split{color:var(--warn);border-color:rgba(251,191,36,.5)}
+.pillv.prov{color:var(--core);border-color:rgba(155,151,232,.5)}
+.pillv.cand{color:var(--warn);border-color:rgba(251,191,36,.5)}
+
+/* ── scoreboard (data/summary) ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--map);border-radius:10px;padding:14px 16px}
+.kpi .n{font-family:var(--f-disp);font-size:30px;font-weight:700;line-height:1}
+.kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-m);margin-top:5px}
+.kpi.ok{border-left-color:var(--ok)} .kpi.ok .n{color:var(--ok)}
+.kpi.crit{border-left-color:var(--crit)} .kpi.crit .n{color:var(--crit)}
+.bar{display:flex;height:24px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin:6px 0 10px}
+.bar span{display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:11px;color:#04121f;font-weight:500;min-width:0}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--chrome);border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:13px;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.hidden{display:none}
 </style>
 </head>
 <body>
 <header>
-  <svg class="mark" viewBox="0 0 120 120" fill="none"><g stroke="#23B58A" stroke-width="6" stroke-linecap="round"><line x1="60" y1="60" x2="34" y2="34"/><line x1="60" y1="60" x2="88" y2="34"/><line x1="60" y1="60" x2="34" y2="88"/><line x1="60" y1="60" x2="88" y2="88"/><line x1="34" y1="34" x2="88" y2="34"/><line x1="34" y1="88" x2="88" y2="88"/></g><g fill="#0A0D1A" stroke="#23B58A" stroke-width="6"><circle cx="34" cy="34" r="9"/><circle cx="88" cy="34" r="9"/><circle cx="34" cy="88" r="9"/><circle cx="88" cy="88" r="9"/></g><circle cx="60" cy="60" r="11" fill="#23B58A"/></svg>
-  <h1>Calibre <i>Map</i><small>Viewer</small></h1>
-  <div class="sp"></div>
-  <span class="meta" id="hmeta"></span>
-  <button class="btn ghost" id="loadBtn2" style="display:none">Load another</button>
+  <div class="logo" onclick="goHome()" aria-label="Calibre Map — home">
+    <svg class="cvmark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><defs><linearGradient id="mapg" x1="5" y1="5" x2="27" y2="27" gradientUnits="userSpaceOnUse"><stop stop-color="#3FE0AE"/><stop offset="1" stop-color="#188A66"/></linearGradient></defs><g stroke="url(#mapg)" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="7" y2="8"/><line x1="16" y1="16" x2="25" y2="9"/><line x1="16" y1="16" x2="8" y2="24"/><line x1="16" y1="16" x2="24" y2="23"/></g><g fill="url(#mapg)"><circle cx="16" cy="16" r="3.5"/><circle cx="7" cy="8" r="2"/><circle cx="25" cy="9" r="2"/><circle cx="8" cy="24" r="2"/><circle cx="24" cy="23" r="2"/></g></svg>
+    <span class="wm"><b>CALIBRE</b><i>MAP</i></span>
+  </div>
+  <div class="crumb" id="crumb">Viewer</div>
+  <span class="saveind" id="saveInd"></span>
+  <button id="backbtn" onclick="goBack()" style="display:none">&larr; Back</button>
+  <button onclick="goHome()">Home</button>
+  <a class="navlink" href="index.html" title="Open the Analysis Engine">Engine</a>
   <input type="file" id="file" accept=".json" hidden>
 </header>
-<nav class="tabs hidden" id="tabs">
-  <button data-t="overview" class="on">Overview</button>
-  <button data-t="materials">Materials</button>
-  <button data-t="families">Families</button>
-  <button data-t="needs">Needs&nbsp;ID</button>
-</nav>
+<main id="main"></main>
+<div class="toast" id="toast"></div>
 
-<div class="wrap">
-  <div id="empty" class="drop">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#3FE0AE" stroke-width="1.5"><path d="M12 15V3m0 0-4 4m4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-    <h2>Load a dataset</h2>
-    <p>Drop a <span class="mono">calibre_map_dataset_*.json</span> here, or click to choose.<br>This is the canonical JSON the Analysis Engine exports.</p>
-    <button class="btn" id="loadBtn">Choose file…</button>
-    <div class="mono" style="margin-top:20px">Runs entirely in your browser · nothing is uploaded · datasets come from the <a href="index.html" style="color:var(--greenb)">Analysis Engine</a></div>
-  </div>
-  <div id="view" class="hidden"></div>
-</div>
-
-<div class="drawer" id="drawer"><button class="x" id="drawerX">✕</button><div id="drawerBody"></div></div>
-
-<script src="numacore_lib.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-const esc = s => (window.NumaCoreLib&&NumaCoreLib.esc)?NumaCoreLib.esc(s):String(s==null?'':s);
+const M = document.getElementById('main');
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const nf = n => (typeof n==='number'? n.toLocaleString() : (n==null?'':n));
-let DATA=null, tab='overview', sortK='net_consumed', sortDir=-1, q='';
+const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+const IC = {
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
+  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6h11v9H3z"/><path d="M14 9h4l3 3v3h-6z"/><circle cx="7" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  layers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>'
+};
 
-// ---- loading ----
+let DATA=null, NAV=[], MAP_TAB='find', LASTQ='', LASTUQ='';
+let DUPINDEX={}, FAMBYMAT={}, UNITINDEX={}, MATBYMN={}, FLEETBYUNIT={}, CATINDEX={};
+const CAT_ORDER=['Brakes','Air system','Charging & starting','Lighting & electrical','Wheel end','Driveline','Suspension & steering','Winter package','Coupling & trailer','Engine & emissions','Cab & body','Unclassified'];
+
+/* ── system-zone taxonomy — ported verbatim from the field app so the drill
+   flows identically. Zones per unit type; sub-systems filter by category + keyword. ── */
+const TRACTOR_ZONES=[
+  {id:'cab',label:'Cab',cats:['Lighting & electrical','Winter package']},
+  {id:'engine',label:'Engine bay',cats:['Engine & emissions','Charging & starting','Air system']},
+  {id:'steer',label:'Steer axle',cats:['Suspension & steering','Wheel end']},
+  {id:'frame',label:'Frame & driveline',cats:['Driveline','Coupling & trailer']},
+  {id:'tandem',label:'Rear tandems · brakes',cats:['Brakes','Suspension & steering','Wheel end','Driveline']}
+];
+const TRAILER_ZONES=[
+  {id:'coupling',label:'Kingpin · landing gear',cats:['Coupling & trailer']},
+  {id:'deck',label:'Deck · lights · electrical',cats:['Lighting & electrical','Coupling & trailer']},
+  {id:'bogey',label:'Axles · brakes · suspension',cats:['Brakes','Suspension & steering','Wheel end','Air system']}
+];
+const SUBSYS={
+  steer:[{l:'King pins & knuckles',cats:['Suspension & steering','Wheel end'],kw:'KING ?PIN|KNUCKLE|DRAWKEY'},
+    {l:'Tie rod & drag link',cats:['Suspension & steering'],kw:'TIE ROD|DRAG LINK|ROD END|ROD ASSY'},
+    {l:'Steering gear & pump',cats:['Suspension & steering'],kw:'STEERING GEAR|GEARBOX|PS PUMP|POWER STEERING|PUMP, STEERING|TAS|RGT|SP33'},
+    {l:'Hubs, bearings & seals',cats:['Wheel end'],kw:'HUB|BEARING|SEAL|STUD|NUT|CUP|CONE'},
+    {l:'Springs & shackles',cats:['Suspension & steering'],kw:'SPRING|SHACKLE|PIN|BUSHING'},
+    {l:'Brakes (chambers, shoes, slack)',cats:['Brakes','Air system'],kw:'CHAMBER|SLACK|SHOE|DRUM|CAM'}],
+  tandem:[{l:'Air springs & shocks',cats:['Suspension & steering'],kw:'AIR SPRING|AIR BAG|SPRING ASSY AIR|SHOCK|W01'},
+    {l:'Torque rods & bushings',cats:['Suspension & steering'],kw:'TORQUE ROD|BUSHING|BAR PIN|BEAM|EQUALIZER|WALKING'},
+    {l:'Diff carriers & housings',cats:['Driveline'],kw:'CARRIER|DIFF|HOUSING|POWER DIVIDER|RATIO|GEAR SET'},
+    {l:'Driveshafts, yokes, U-joints',cats:['Driveline'],kw:'YOKE|U-JOINT|UNIVERSAL|DRIVESHAFT|SPL|1710|1810|SLIP'},
+    {l:'Wheel seals, hubs & bearings',cats:['Wheel end'],kw:'SEAL|HUB|BEARING|STUD|CUP|CONE|CAP'},
+    {l:'Foundation brakes',cats:['Brakes'],kw:'SHOE|DRUM|CHAMBER|SLACK|CAM|LINING|HARDWARE|ROTOR|PAD'}],
+  engine:[{l:'Turbo & exhaust',cats:['Engine & emissions','Lighting & electrical'],kw:'TURBO|EXHAUST|V-BAND|MANIFOLD|DPF|CLAMP'},
+    {l:'Fuel & injectors',cats:['Engine & emissions'],kw:'INJECTOR|FUEL|PUMP, FUEL|LINE|TUBE'},
+    {l:'Cooling, belts & tensioners',cats:['Engine & emissions'],kw:'BELT|TENSIONER|WATER PUMP|THERMOSTAT|FAN|RADIATOR|COOLANT|PULLEY'},
+    {l:'Charging & starting',cats:['Charging & starting'],kw:'.'},
+    {l:'Air compressor & dryer',cats:['Air system'],kw:'COMPRESSOR|DRYER|GOVERNOR|CARTRIDGE|DESICCANT'},
+    {l:'Engine harnesses & sensors',cats:['Engine & emissions','Lighting & electrical'],kw:'HARNESS|SENSOR|ECM|WIRING|SOLENOID'}],
+  cab:[{l:'Lighting & beacons',cats:['Lighting & electrical'],kw:'LAMP|LIGHT|LED|BEACON|HEADLAMP|MARKER|STROBE|BULB'},
+    {l:'Wipers & washers',cats:['Lighting & electrical'],kw:'WIPER|WASHER|NOZZLE|BLADE|ARM'},
+    {l:'Mirrors',cats:['Lighting & electrical'],kw:'MIRROR'},
+    {l:'Cab HVAC (cores, blowers, controls)',cats:['Winter package','Lighting & electrical'],kw:'HEATER|HVAC|CORE|BLOWER|VALVE, BODY|ACTUATOR|CONTROL'},
+    {l:'Winter heat (fired, block, battery)',cats:['Winter package'],kw:'WEBASTO|ESPAR|AIRTRONIC|BLOCK|ZEROSTART|IMMERSION|PAD|CIRCULAT|GLOW|CORD'},
+    {l:'Switches, fuses & harnesses',cats:['Lighting & electrical','Charging & starting'],kw:'SWITCH|FUSE|RELAY|HARNESS|SOCKET|PLUG|TERMINAL'}],
+  frame:[{l:'5th wheel & coupling',cats:['Coupling & trailer'],kw:'FIFTH|5TH|KINGPIN|KING PIN|GLADHAND|CAMLOCK|SOCKET|PLUG'},
+    {l:'Driveshafts & PTO',cats:['Driveline'],kw:'YOKE|U-JOINT|SHAFT|PTO|SPL|SLIP'},
+    {l:'Air tanks & valves',cats:['Air system','Brakes'],kw:'TANK|VALVE|GOVERNOR|CHECK'},
+    {l:'Frame clamps & mounts',cats:['Lighting & electrical','Engine & emissions'],kw:'CLAMP|MOUNT|BRACKET|STRAP|HANGER'}],
+  coupling:[{l:'Kingpin & upper coupler',cats:['Coupling & trailer','Suspension & steering'],kw:'KINGPIN|KING PIN|KP-T|COUPLER|PLATE'},
+    {l:'Landing gear',cats:['Coupling & trailer'],kw:'LANDING|LEG|XA-S|CRANK'},
+    {l:'Gladhands, camlocks & hoses',cats:['Coupling & trailer','Air system'],kw:'GLADHAND|CAMLOCK|HOSE|GASKET|SOCKET|PLUG'}],
+  bogey:[{l:'Air springs & suspension',cats:['Suspension & steering'],kw:'AIR SPRING|AIR BAG|BUSHING|BEAM|EQUALIZER|SRK|HANGER|SHOCK'},
+    {l:'Trailer ABS & valves',cats:['Coupling & trailer','Air system','Brakes'],kw:'ABS|MODULATOR|ECU|VALVE|SENSOR'},
+    {l:'Wheel ends (seals, hubs, caps)',cats:['Wheel end'],kw:'SEAL|HUB|BEARING|CAP|STUD|SPINDLE'},
+    {l:'Foundation brakes',cats:['Brakes'],kw:'SHOE|DRUM|CHAMBER|SLACK|CAM|LINING'}],
+  deck:[{l:'Marker & tail lamps',cats:['Lighting & electrical'],kw:'LAMP|LIGHT|LED|MARKER|GROMMET|PIGTAIL'},
+    {l:'Harnesses, sockets & cables',cats:['Lighting & electrical','Coupling & trailer'],kw:'HARNESS|SOCKET|CABLE|PLUG|WIRE'},
+    {l:'Deck hardware & mudflaps',cats:['Coupling & trailer','Lighting & electrical'],kw:'MUDFLAP|BRACKET|BOX|LATCH|WHIP'}]
+};
+function zonesFor(u){ return (u && /trail/i.test(u.type||'')) ? TRAILER_ZONES : TRACTOR_ZONES; }
+
+/* ── persistence: keep the loaded dataset across restarts (IndexedDB + localStorage fallback) ── */
+const STORE_KEY='calibre_map.viewer.dataset';
+const Store=(function(){
+  const DBN='calibre_map', ST='kv';
+  function idb(){ return new Promise((res,rej)=>{ try{ const r=indexedDB.open(DBN,1);
+    r.onupgradeneeded=()=>{ try{ r.result.createObjectStore(ST); }catch(_){}};
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); }
+  async function set(k,v){ try{ const db=await idb(); return await new Promise((res,rej)=>{ const t=db.transaction(ST,'readwrite'); t.objectStore(ST).put(v,k); t.oncomplete=()=>res(true); t.onerror=()=>rej(t.error); }); }catch(e){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(_){ return false; } } }
+  async function get(k){ try{ const db=await idb(); return await new Promise((res,rej)=>{ const t=db.transaction(ST,'readonly'); const rq=t.objectStore(ST).get(k); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }catch(e){ try{ const s=localStorage.getItem(k); return s?JSON.parse(s):null; }catch(_){ return null; } } }
+  async function del(k){ try{ const db=await idb(); await new Promise(res=>{ const t=db.transaction(ST,'readwrite'); t.objectStore(ST).delete(k); t.oncomplete=()=>res(); t.onerror=()=>res(); }); }catch(e){} try{ localStorage.removeItem(k); }catch(_){}; return true; }
+  return { set, get, del };
+})();
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ── file loading + persistence ── */
 function pick(){ $('#file').click(); }
-$('#loadBtn').addEventListener('click', pick);
-$('#loadBtn2').addEventListener('click', pick);
-$('#file').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f); });
-['dragover','dragenter'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();$('#empty').classList.add('over');}));
-['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();$('#empty').classList.remove('over');}));
-document.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f&&f.name.toLowerCase().endsWith('.json')) readFile(f); });
-function readFile(f){ const r=new FileReader(); r.onload=()=>{ try{ load(JSON.parse(r.result)); }catch(err){ alert('Could not parse JSON: '+err.message); } }; r.readAsText(f); }
-
-function load(d){
+$('#file').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f); e.target.value=''; });
+function readFile(f){ const r=new FileReader(); r.onload=()=>{ try{ ingest(JSON.parse(r.result), f.name); }catch(err){ alert('Could not parse JSON: '+err.message); } }; r.readAsText(f); }
+function ingest(d, name, opts){
+  opts=opts||{};
   DATA=d;
-  const m=d.meta||{}, c=d.counts||{};
-  $('#hmeta').textContent = (d.schemaVersion?('schema v'+d.schemaVersion+' · '):'') + (m.generatedAt?('generated '+String(m.generatedAt).slice(0,10)):'');
-  $('#empty').classList.add('hidden'); $('#view').classList.remove('hidden'); $('#tabs').classList.remove('hidden'); $('#loadBtn2').style.display='';
-  render();
+  DUPINDEX={}; FAMBYMAT={}; UNITINDEX={}; MATBYMN={}; FLEETBYUNIT={}; CATINDEX={};
+  (d.materials||[]).forEach(x=>{
+    MATBYMN[String(x.material)]=x;
+    if(x.duplicate_group){ (DUPINDEX[x.duplicate_group]=DUPINDEX[x.duplicate_group]||[]).push(x); }
+    (x.where_used||[]).forEach(wu=>{ if(!wu||!wu.unit) return; (UNITINDEX[wu.unit]=UNITINDEX[wu.unit]||[]).push({mn:String(x.material), qty:wu.qty}); });
+    const cc=x.category||'Unclassified'; (CATINDEX[cc]=CATINDEX[cc]||[]).push(x);
+  });
+  (d.families||[]).forEach(f=>{ (f.members||[]).forEach(mm=>{ FAMBYMAT[String(mm.material)]=f; }); });
+  (d.fleet||[]).forEach(u=>{ if(u&&u.unit) FLEETBYUNIT[String(u.unit)]=u; });
+  const m=d.meta||{};
+  $('#saveInd').textContent = opts.restored ? 'restored' : '';
+  goHome();
+  if(!opts.restored){
+    Store.set(STORE_KEY, { d, name:name||null, savedAt:new Date().toISOString() }).then(ok=>{ $('#saveInd').textContent = ok?'saved in browser':''; });
+  }
 }
-document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
-  tab=b.dataset.t; document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.toggle('on',x===b)); render();
-}));
-
-// ---- render ----
-function render(){
+async function clearSaved(){
+  await Store.del(STORE_KEY);
+  DATA=null; $('#saveInd').textContent='';
+  toast('Cleared saved dataset'); goHome();
+}
+function exportJson(){
   if(!DATA) return;
-  if(tab==='overview') renderOverview();
-  else if(tab==='materials') renderMaterials();
-  else if(tab==='families') renderFamilies();
-  else if(tab==='needs') renderNeeds();
+  const blob=new Blob([JSON.stringify(DATA)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download='calibre_map_dataset_'+(new Date().toISOString().slice(0,10))+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
-function renderOverview(){
-  const c=DATA.counts||{}, sb=DATA.scoreboard||null, m=DATA.meta||{};
-  const kp=[
-    ['materials', (c.materials!=null?c.materials:(DATA.materials||[]).length), ''],
-    ['families verified', (c.families!=null?c.families:(DATA.families||[]).length), ''],
-    ['dispositions', (c.dispositions!=null?c.dispositions:(DATA.duplicate_disposition||[]).length), ''],
-    ['need identification', (c.needsIdentification!=null?c.needsIdentification:(DATA.needs_identification||[]).length), 'amber'],
-  ];
+/* ── navigation ── */
+function crumb(t){ $('#crumb').textContent = t; }
+function here(id, fn){ NAV.push({id, fn}); $('#backbtn').style.display = NAV.length>1 ? '' : 'none'; }
+function goBack(){ if(NAV.length<=1){ goHome(); return; } NAV.pop(); const prev=NAV[NAV.length-1]; NAV.pop(); prev.fn(); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && NAV.length>1) goBack(); });
+
+/* ── HOME ── */
+function goHome(){
+  NAV=[]; here('home', goHome);
+  $('#backbtn').style.display='none';
+  if(!DATA){ crumb('Viewer'); renderLoad(); return; }
+  crumb('Viewer · '+((DATA.meta&&DATA.meta.clientCode)||'dataset'));
+  const c=DATA.counts||{};
+  const parts=(c.materials!=null?c.materials:(DATA.materials||[]).length);
+  const units=Object.keys(UNITINDEX).length;
+  const fams=(c.families!=null?c.families:(DATA.families||[]).length);
+  const needs=(c.needsIdentification!=null?c.needsIdentification:(DATA.needs_identification||[]).length);
+  M.innerHTML = `
+  <h2>How can I help navigate you today?</h2>
+  <div class="modes">
+    <div class="modecard mc-map" onclick="mapHome()"><div class="glow"></div>
+      <div class="eyebrow">Mode 1</div><div class="name">Parts Mapping</div>
+      <div class="desc">Find a part from a unit — or type any number and see what it is, what it fits, and its potential duplicates.</div></div>
+    <div class="modecard mc-verify" onclick="dupHome()"><div class="glow"></div>
+      <div class="eyebrow">Mode 2</div><div class="name">Duplicate Families</div>
+      <div class="desc">Field-verified families and desk-hypothesis candidate groups — what to keep, what to retire.</div></div>
+    <div class="modecard mc-equip" onclick="fleetHome()"><div class="glow"></div>
+      <div class="eyebrow">Mode 3</div><div class="name">Fleet &amp; Units</div>
+      <div class="desc">Browse units and the parts consumed on each — plus parts still needing identification.</div></div>
+    <div class="modecard mc-data" onclick="dataHome()"><div class="glow"></div>
+      <div class="eyebrow">Files · Settings</div><div class="name">Data &amp; Settings</div>
+      <div class="desc">Load or swap the dataset, export it, review sources, and manage what's saved in this browser.</div></div>
+  </div>
+  <div class="statgrid">
+    <div class="stat"><div class="n">${nf(parts)}</div><div class="l">parts</div></div>
+    <div class="stat"><div class="n">${nf(units)}</div><div class="l">units</div></div>
+    <div class="stat"><div class="n">${nf(fams)}</div><div class="l">dup families</div></div>
+    <div class="stat"><div class="n">${nf(needs)}</div><div class="l">need ID</div></div>
+  </div>
+  <div class="note">Dataset schema v${esc(DATA.schemaVersion||'?')}${DATA.meta&&DATA.meta.generatedAt?' · generated '+esc(String(DATA.meta.generatedAt).slice(0,10)):''} · read-only · runs entirely in your browser.</div>`;
+}
+
+function renderLoad(){
+  M.innerHTML = `
+  <div class="loadhero" id="loadhero">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15V3m0 0-4 4m4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    <h2>Load a dataset</h2>
+    <p>Drop a <span style="font-family:var(--f-mono);color:var(--map)">calibre_map_dataset_*.json</span> here, or click to choose.<br>This is the canonical JSON the Analysis Engine exports.</p>
+    <button class="primary" style="max-width:260px;margin:0 auto" onclick="pick()">Choose file…</button>
+    <div class="note" style="margin-top:20px">Once loaded it's remembered in this browser — you won't need to re-drop it next time.</div>
+  </div>`;
+  const z=$('#loadhero');
+  ['dragenter','dragover'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.add('over');}));
+  ['dragleave','dragend'].forEach(ev=>z.addEventListener(ev,()=>z.classList.remove('over')));
+  z.addEventListener('drop',e=>{ e.preventDefault(); z.classList.remove('over'); const f=e.dataTransfer.files[0]; if(f&&f.name.toLowerCase().endsWith('.json')) readFile(f); });
+  z.addEventListener('click',e=>{ if(e.target.closest('button')) return; pick(); });
+}
+
+/* ═══ MODE 1 · PARTS MAPPING ═══ */
+function mapTab(t){ MAP_TAB=t; mapHome(); }
+function mapHome(){
+  crumb('Parts Mapping'); here('map', mapHome);
+  const tab=(id,lbl,ic)=>`<div class="ftab ${MAP_TAB===id?'on':''}" onclick="mapTab('${id}')">${ic} ${lbl}</div>`;
+  let panel='';
+  if(MAP_TAB==='find') panel=`
+    <h2 style="color:var(--map)">Find any part</h2>
+    <input class="search" id="q" placeholder="Type ANY number — SAP#, vendor PN, description…" value="${esc(LASTQ)}" oninput="doSearch(this.value)">
+    <div id="mline" class="eyebrow-mono" style="margin:0 0 10px"></div>
+    <div id="results"></div>`;
+  else if(MAP_TAB==='unit') panel=`
+    <h2 style="color:var(--map)">Which unit?</h2>
+    <input class="search" id="uq" placeholder="Unit number (TT3084, TT3008…)" value="${esc(LASTUQ)}" oninput="unitSearch(this.value)">
+    <h3>Units</h3><div id="units" class="list"></div>`;
+  else panel=`
+    <h2 style="color:var(--map)">Browse by system</h2>
+    <div class="note" style="margin:0 0 12px">Every part sits in a bucket — the 10 systems plus <b>Unclassified</b> (no keyword matched yet). Tap a bucket to see its parts.</div>
+    <div class="tiles" id="buckets"></div>`;
+  M.innerHTML = `
+  <div class="ftabs">${tab('find','Find a part',IC.search)}${tab('unit','Start from a unit',IC.truck)}${tab('bucket','Browse by system',IC.layers)}</div>
+  <div class="fpanel">${panel}</div>`;
+  if(MAP_TAB==='find'){ const el=$('#q'); if(el){ el.focus(); } doSearch(LASTQ); }
+  else if(MAP_TAB==='unit') unitSearch(LASTUQ);
+  else renderBuckets();
+}
+function renderBuckets(){
+  const el=$('#buckets'); if(!el) return;
+  const known=CAT_ORDER.filter(c=>CATINDEX[c]&&CATINDEX[c].length);
+  const extra=Object.keys(CATINDEX).filter(c=>CAT_ORDER.indexOf(c)<0).sort();
+  const cats=known.concat(extra);
+  el.innerHTML=cats.map(c=>{ const n=(CATINDEX[c]||[]).length;
+    return `<div class="tile${c==='Unclassified'?' zero':''}" onclick="bucketView('${esc(c)}')">
+      <span class="tic">${IC.box}</span>
+      <div style="flex:1"><div class="tn">${esc(c)}</div><div class="tc">${n} part${n===1?'':'s'}</div></div>
+      <span class="chev">${IC.chev}</span></div>`; }).join('') || '<div class="note">No categorised parts in this dataset.</div>';
+}
+function bucketView(cat){
+  crumb('System · '+cat); here('bucket:'+cat, ()=>bucketView(cat));
+  const parts=(CATINDEX[cat]||[]).slice().sort((a,b)=>(Number(b.net_consumed)||0)-(Number(a.net_consumed)||0));
+  M.innerHTML = `
+  <div class="hero"><div class="eyebrow-mono">System bucket</div><div class="pn">${esc(cat)}</div>
+    <div class="dl">${parts.length} part${parts.length===1?'':'s'}${cat==='Unclassified'?' · no keyword matched yet — still searchable, and upgradeable via the Assessment Tool':''}</div></div>
+  ${parts.length?`<div class="list">${parts.slice(0,200).map(m=>partRow(m)).join('')}${parts.length>200?`<div class="note">Showing top 200 of ${parts.length} by net consumption.</div>`:''}</div>`:'<div class="note">No parts in this bucket.</div>'}
+  <button class="ghost" onclick="goBack()">← back</button>`;
+}
+function doSearch(q){
+  LASTQ=q||''; const R=$('#results'), ML=$('#mline'); if(!R) return;
+  const n=norm(q);
+  if(n.length<2){ R.innerHTML='<div class="note">Type at least 2 characters — SAP number, vendor PN, or a word from the description.</div>'; if(ML) ML.textContent=''; return; }
+  const raw=q.trim().toLowerCase();
+  const hits=(DATA.materials||[]).filter(m=>
+    norm(m.material).includes(n) || norm(m.pn).includes(n) ||
+    String(m.description||'').toLowerCase().includes(raw) || String(m.traced_brand||'').toLowerCase().includes(raw)
+  ).slice(0,60);
+  if(ML){ const nf2=new Set(hits.map(m=>m.duplicate_group).filter(Boolean)).size;
+    ML.innerHTML = hits.length ? `${hits.length} match${hits.length>1?'es':''}${nf2?` · <span style="color:var(--crit)">${nf2} duplicate group${nf2>1?'s':''}</span>`:''}` : ''; }
+  R.innerHTML = hits.length ? '<div class="list">'+hits.map(partRow).join('')+'</div>'
+    : '<div class="note">No match. Check the number, or it may be a part still needing identification (see Fleet &amp; Units → Needs ID).</div>';
+}
+function dupBadge(m){
+  const fam=FAMBYMAT[String(m.material)];
+  if(fam) return fam.verdict==='SAME'?'<span class="badge b-same">same → merge</span>':fam.verdict==='SPLIT'?'<span class="badge b-split">split</span>':`<span class="badge b-dup">${esc(fam.verdict)}</span>`;
+  const g=m.duplicate_group&&DUPINDEX[m.duplicate_group];
+  if(g&&g.length>1) return `<span class="badge b-dup">dup family · ${g.length}</span>`;
+  return '';
+}
+function partRow(m){
+  const mn=String(m.material);
+  return `<div class="row" onclick="partView('${mn}')">
+    <div style="flex:1;min-width:0">
+      <div class="t"><span class="sap">SAP#</span> ${esc(mn)}${m.pn?` <b>· ${esc(m.pn)}</b>`:''}</div>
+      <div class="s">${esc(m.description||'')}${m.traced_brand?' · '+esc(m.traced_brand):''}</div>
+      <div class="badges">
+        ${m.on_hand!=null&&+m.on_hand>0?`<span class="badge b-oh">On hand · ${esc(m.on_hand)}</span>`:''}
+        ${m.net_consumed?`<span class="badge b-net">Net ${esc(nf(m.net_consumed))}</span>`:''}
+        ${m.mrp_type?`<span class="badge b-mrp">MRP ${esc(m.mrp_type)}</span>`:''}
+        ${dupBadge(m)}
+      </div>
+    </div><span class="chev">${IC.chev}</span></div>`;
+}
+function partView(mn){
+  const m=MATBYMN[String(mn)]; if(!m) return;
+  crumb('Part · '+(m.pn||mn)); here('part:'+mn, ()=>partView(mn));
+  const wu=(m.where_used||[]);
+  M.innerHTML = `
+  <div class="hero">
+    <div class="eyebrow-mono">SAP# ${esc(mn)}</div>
+    <div class="pn">${esc(m.pn||m.description||mn)}</div>
+    <div class="dl">${esc(m.traced_brand?m.traced_brand+' · ':'')}${esc(m.description||'')}</div>
+    <div class="dl">On hand — ${esc(m.on_hand==null?'—':nf(m.on_hand))}${m.net_consumed?' · Net consumed — '+esc(nf(m.net_consumed)):''}${wu.length?' · '+wu.length+' unit'+(wu.length>1?'s':''):''}</div>
+  </div>
+  <div class="factgrid">
+    <div class="card"><div class="fh">Identity</div><div class="kv">
+      <div class="k">SAP#</div><div class="v"><b>${esc(mn)}</b></div>
+      <div class="k">Vendor PN</div><div class="v"><b>${esc(m.pn||'—')}</b></div>
+      <div class="k">True brand</div><div class="v">${esc(m.traced_brand||'—')}</div>
+      <div class="k">Description</div><div class="v">${esc(m.description||'—')}</div>
+      <div class="k">Identity</div><div class="v">${m.identified===false?'<span style="color:var(--warn)">not in master — needs identification</span>':'in material master'}</div>
+    </div></div>
+    <div class="card"><div class="fh">Stock &amp; MRP</div><div class="kv">
+      <div class="k">On hand</div><div class="v">${esc(m.on_hand==null?'—':nf(m.on_hand))}</div>
+      <div class="k">Net consumed</div><div class="v">${esc(m.net_consumed==null?'—':nf(m.net_consumed))}</div>
+      <div class="k">MRP / ROP / Max</div><div class="v">${esc(m.mrp_type||'—')} · ${m.rop==null?'—':esc(m.rop)} · ${m.max==null?'—':esc(m.max)}</div>
+      <div class="k">Consuming units</div><div class="v">${esc(m.consuming_units!=null?m.consuming_units:wu.length)}</div>
+      <div class="k">Dup group</div><div class="v">${esc(m.duplicate_group||'—')}</div>
+    </div></div>
+  </div>
+  <h3 style="color:var(--map)">Potential duplicates</h3>
+  ${dupPanel(m)}
+  <h3 style="color:var(--map)">Where used${wu.length?` — ${wu.length} unit${wu.length>1?'s':''}`:''}</h3>
+  <div class="wu">${ wu.length ? wu.slice(0,50).map(u=>`<div class="u"><div class="uh"><span>${esc(u.unit)}</span><b>${esc(nf(u.qty))}</b></div>${(u.wos||[]).slice(0,6).map(w=>`<div class="wos">${esc(w[0])} · ${esc(nf(w[1]))} · ${esc(w[2])} · ${esc(w[3]||'')}</div>`).join('')}</div>`).join('') : '<div class="note">No work-order issues recorded for this part in the dataset.</div>' }</div>
+  <button class="ghost" onclick="goBack()">← back</button>`;
+  document.querySelectorAll('#main .dupmemb[data-mn]').forEach(el=>el.addEventListener('click',()=>partView(el.dataset.mn)));
+}
+function dupRow(mn, tag){
+  const s=MATBYMN[String(mn)];
+  const id=s?[s.pn||'', s.traced_brand||'', s.description||''].filter(Boolean).map(esc).join(' · '):'';
+  const oh=(s&&s.on_hand!=null)?('OH '+nf(s.on_hand)):'';
+  const tg=tag?`<b class="${tag==='keep'?'keep':'ret'}">${tag==='keep'?'KEEP':'retire'}</b> `:'';
+  return `<div class="dupmemb" data-mn="${esc(mn)}"><span class="dupmn">${esc(mn)}</span><span class="dupid">${id}</span><span class="dupoh">${tg}${oh}</span></div>`;
+}
+function dupPanel(m){
+  const fam=FAMBYMAT[String(m.material)];
+  const sibs=(m.duplicate_group&&DUPINDEX[m.duplicate_group])?DUPINDEX[m.duplicate_group].filter(x=>String(x.material)!==String(m.material)):[];
+  if(fam){
+    const vlabel=fam.verdict==='SAME'?'<span class="pillv same">SAME → merge</span>':fam.verdict==='SPLIT'?'<span class="pillv split">SPLIT — keep separate</span>':'<span class="pillv">'+esc(fam.verdict)+'</span>';
+    const me=(fam.members||[]).find(mm=>String(mm.material)===String(m.material));
+    const others=(fam.members||[]).filter(mm=>String(mm.material)!==String(m.material));
+    return `<div class="okbox"><b>Field-verified · family ${esc(fam.family_id)}</b> ${vlabel}${fam.provisional?' <span class="pillv prov">no tech pref</span>':''}
+      <div style="margin:6px 0 2px">This part: <b class="${me&&me.keep?'':'ret'}" style="color:${me&&me.keep?'var(--ok)':'var(--crit)'}">${me&&me.keep?'KEEP':'retire'}</b>${fam.site_answer?' · “'+esc(fam.site_answer)+'”':''}${fam.tech?' · by '+esc(fam.tech):''}</div>
+      ${others.map(mm=>dupRow(mm.material, mm.keep?'keep':'retire')).join('')}</div>`;
+  }
+  if(sibs.length){
+    return `<div class="warnbox"><b>Candidate duplicates</b> <span class="pillv cand">unverified</span> — this part shares a duplicate group (<i>${esc(m.duplicate_group)}</i>) with ${sibs.length} other${sibs.length>1?'s':''} in the traced register. Not yet field-verified — check the bins before ordering.
+      ${sibs.map(s=>dupRow(s.material)).join('')}</div>`;
+  }
+  return '<div class="note">No known duplicates for this part.</div>';
+}
+
+/* ═══ MODE 1b · START FROM A UNIT ═══ */
+function unitSearch(q){
+  const U=$('#units'); if(!U) return; LASTUQ=q||'';
+  const n=(q||'').toUpperCase();
+  const units=Object.keys(UNITINDEX).sort();
+  const list=units.filter(u=>!n||u.toUpperCase().includes(n)).slice(0,60);
+  U.innerHTML = list.length ? list.map(u=>{
+    const parts=UNITINDEX[u]; const q2=parts.reduce((s,p)=>s+(+p.qty||0),0);
+    return `<div class="row" onclick="unitView('${esc(u)}')">
+      <span class="tic">${IC.truck}</span>
+      <div style="flex:1;min-width:0"><div class="t">${esc(u)}</div>
+        <div class="s">${parts.length} part${parts.length>1?'s':''} consumed · ${nf(Math.round(q2))} issued</div></div>
+      <span class="chev">${IC.chev}</span></div>`;
+  }).join('') : '<div class="note">No unit matches. Units come from the work-order (where-used) history in the dataset.</div>';
+}
+// unit → pick a system zone (mirrors the app's "Start from a unit" drill)
+function partsInCats(cats, kw){
+  const re = kw ? new RegExp(kw,'i') : null;
+  return (DATA.materials||[]).filter(m=> m.category && cats.indexOf(m.category)>=0 && (!re || re.test((m.description||'')+' '+(m.fits||''))));
+}
+function unitView(uid){
+  const u=FLEETBYUNIT[uid]||{unit:uid};
+  const consumed=(UNITINDEX[uid]||[]);
+  crumb('Unit · '+uid); here('unit:'+uid, ()=>unitView(uid));
+  const zones=zonesFor(u);
+  const zoneTiles=zones.map(z=>{ const n=partsInCats(z.cats).length;
+    return `<div class="tile ${n?'':'zero'}" onclick="zoneView('${esc(uid)}','${z.id}')">
+      <span class="tic">${IC.layers}</span>
+      <div style="flex:1"><div class="tn">${esc(z.label)}</div><div class="tc">${n} part${n===1?'':'s'}</div></div>
+      <span class="chev">${IC.chev}</span></div>`;
+  }).join('');
+  const nc=new Set(consumed.map(c=>c.mn)).size;
+  M.innerHTML = `
+  <div class="hero"><div class="eyebrow-mono">${esc([u.type,u.year,u.engine].filter(Boolean).join(' · ')||'unit')}</div>
+    <div class="pn">${esc(uid)}</div><div class="dl">${esc([u.make,u.model].filter(Boolean).join(' ')||'not in fleet register')}</div></div>
+  <h3 style="color:var(--map)">Pick a system</h3>
+  <div class="tiles">${zoneTiles}</div>
+  ${nc?`<div class="tile consumed" onclick="unitConsumed('${esc(uid)}')" style="margin-bottom:14px">
+      <span class="tic">${IC.clock}</span>
+      <div style="flex:1"><div class="tn">Parts actually consumed here</div><div class="tc">${nc} part${nc===1?'':'s'} issued on this unit's work orders</div></div>
+      <span class="chev">${IC.chev}</span></div>`:''}
+  <button class="ghost" onclick="goBack()">← back</button>`;
+}
+function zoneView(uid, zid){
+  const u=FLEETBYUNIT[uid]||{unit:uid};
+  const z=zonesFor(u).find(x=>x.id===zid); const ss=SUBSYS[zid];
+  if(!ss) return compView(uid, zid, -1);
+  crumb(uid+' · '+z.label); here('zone:'+uid+':'+zid, ()=>zoneView(uid,zid));
+  const tiles=ss.map((c,i)=>{ const n=partsInCats(c.cats, c.kw).length;
+    return `<div class="tile ${n?'':'zero'}" onclick="compView('${esc(uid)}','${zid}',${i})">
+      <span class="tic">${IC.box}</span>
+      <div style="flex:1"><div class="tn">${esc(c.l)}</div><div class="tc">${n} part${n===1?'':'s'}</div></div>
+      <span class="chev">${IC.chev}</span></div>`;
+  }).join('');
+  M.innerHTML = `
+  <div class="hero"><div class="eyebrow-mono">${esc(uid)} · ${esc(z.label)}</div><div class="pn" style="font-size:24px">Pick a sub-system</div></div>
+  <div class="tiles">${tiles}</div>
+  <button class="ghost" onclick="goBack()">← back</button>`;
+}
+function compView(uid, zid, ci){
+  const u=FLEETBYUNIT[uid]||{unit:uid};
+  const z=zonesFor(u).find(x=>x.id===zid); const ss=SUBSYS[zid];
+  const comp = (ci>=0 && ss) ? ss[ci] : null;
+  const cats = comp ? comp.cats : (z?z.cats:[]);
+  const mk = String(u.make||'').toUpperCase().slice(0,6);
+  let parts = partsInCats(cats, comp?comp.kw:null);
+  parts.sort((a,b)=>{ const am=((a.fits||'')+(a.description||'')).toUpperCase().includes(mk)&&mk?0:1;
+    const bm=((b.fits||'')+(b.description||'')).toUpperCase().includes(mk)&&mk?0:1;
+    return am-bm || (Number(b.on_hand)||0)-(Number(a.on_hand)||0); });
+  crumb(uid+' · '+(comp?comp.l:(z?z.label:''))); here('comp:'+uid+':'+zid+':'+ci, ()=>compView(uid,zid,ci));
+  M.innerHTML = `
+  <div class="hero"><div class="eyebrow-mono">${esc(uid)}${z?' · '+esc(z.label):''}</div>
+    <div class="pn" style="font-size:24px">${esc(comp?comp.l:(z?z.label:'Parts'))}</div>
+    <div class="dl">${parts.length} part${parts.length===1?'':'s'}${mk?' · '+esc(u.make)+'-matched first':''}</div></div>
+  ${parts.length?`<div class="list">${parts.slice(0,120).map(m=>partRow(m)).join('')}</div>`
+    :'<div class="note">No parts in this sub-system for the current dataset. Coverage grows as identity work categorises more of the material master.</div>'}
+  <button class="ghost" onclick="goBack()">← back</button>`;
+}
+function unitConsumed(uid){
+  const parts=(UNITINDEX[uid]||[]).slice();
+  crumb('Unit · '+uid+' · consumed'); here('unitc:'+uid, ()=>unitConsumed(uid));
+  const agg={}; parts.forEach(p=>{ agg[p.mn]=(agg[p.mn]||0)+(+p.qty||0); });
+  const rows=Object.keys(agg).map(mn=>({m:MATBYMN[mn], qty:agg[mn]})).filter(x=>x.m).sort((a,b)=>b.qty-a.qty);
+  M.innerHTML = `
+  <div class="hero"><div class="eyebrow-mono">Unit · work-order history</div><div class="pn">${esc(uid)}</div>
+    <div class="dl">${rows.length} distinct part${rows.length===1?'':'s'} consumed</div></div>
+  <div class="list">${rows.map(r=>`<div class="row" onclick="partView('${esc(String(r.m.material))}')">
+    <div style="flex:1;min-width:0">
+      <div class="t"><span class="sap">SAP#</span> ${esc(r.m.material)}${r.m.pn?` <b>· ${esc(r.m.pn)}</b>`:''}</div>
+      <div class="s">${esc(r.m.description||'')}${r.m.traced_brand?' · '+esc(r.m.traced_brand):''}</div>
+      <div class="badges"><span class="badge b-net">Qty ${esc(nf(Math.round(r.qty)))}</span>${dupBadge(r.m)}</div>
+    </div><span class="chev">${IC.chev}</span></div>`).join('')}</div>
+  <button class="ghost" onclick="goBack()">← back</button>`;
+}
+
+/* ═══ MODE 2 · DUPLICATE FAMILIES ═══ */
+function dupHome(){
+  crumb('Duplicate Families'); here('dup', dupHome);
+  const fams=(DATA.families||[]);
+  const vp=v=> v==='SAME'?'<span class="pillv same">SAME → merge</span>':v==='SPLIT'?'<span class="pillv split">SPLIT</span>':'<span class="pillv">'+esc(v)+'</span>';
+  const cands=Object.entries(DUPINDEX).filter(([g,a])=>a.length>1).map(([g,a])=>({g,a})).sort((x,y)=>y.a.length-x.a.length);
+  const famHtml = fams.length ? `<div class="grid2">${fams.map(f=>`
+    <div class="fam"><div class="fh"><span class="fid">${esc(f.family_id)}</span>${vp(f.verdict)}${f.provisional?'<span class="pillv prov">no tech pref</span>':''}</div>
+      ${(f.members||[]).map(mm=>`<div class="memb" data-mn="${esc(mm.material)}"><span class="mnm">${esc(mm.material)}</span><span class="${mm.keep?'keep':'ret'}">${mm.keep?'KEEP':'retire'} · pile ${esc(mm.pile)}</span></div>`).join('')}
+      <div class="note">${f.tech?('by '+esc(f.tech)+' · '):''}${f.ts?esc(String(f.ts).slice(0,10)):''}${f.site_answer?' · “'+esc(f.site_answer)+'”':''}</div>
+    </div>`).join('')}</div>` : '<div class="note">No field-verified families in this dataset yet.</div>';
+  const candHtml = cands.length ? `<div class="grid2">${cands.map(c=>`
+    <div class="fam cand"><div class="fh"><span class="fid sm">${esc(c.g)}</span><span class="pillv cand">${c.a.length} candidates</span></div>
+      ${c.a.map(s=>`<div class="memb" data-mn="${esc(s.material)}"><span class="mnm">${esc(s.material)}</span><span class="muted">${esc(s.pn||'')}${s.traced_brand?' · '+esc(s.traced_brand):''}</span></div>`).join('')}
+    </div>`).join('')}</div>` : '<div class="note">No candidate groups in this dataset.</div>';
+  M.innerHTML = `
+  <h2 style="color:var(--verify-t)">Duplicate families</h2>
+  <h3>Field-verified — ${fams.length}</h3>${famHtml}
+  <h3 style="margin-top:20px">Candidate groups · desk hypothesis — ${cands.length}</h3>
+  <div class="note" style="margin-bottom:10px">Parts sharing a duplicate group in the traced register — potential duplicates not yet physically verified. Tap any part to open its record.</div>${candHtml}
+  <button class="ghost" onclick="goHome()">← home</button>`;
+  document.querySelectorAll('#main .memb[data-mn]').forEach(el=>el.addEventListener('click',()=>partView(el.dataset.mn)));
+}
+
+/* ═══ MODE 3 · FLEET & UNITS ═══ */
+function fleetHome(){
+  crumb('Fleet & Units'); here('fleet', fleetHome);
+  const needs=(DATA.needs_identification||[]);
+  M.innerHTML = `
+  <h2 style="color:var(--equip-t)">Fleet &amp; units</h2>
+  <input class="search" id="uq" placeholder="Unit number (TT3084, TT3008…)" value="${esc(LASTUQ)}" oninput="unitSearch(this.value)">
+  <h3>Units — ${Object.keys(UNITINDEX).length}</h3>
+  <div id="units" class="list"></div>
+  <h3 style="margin-top:20px">Needs identification — ${needs.length}</h3>
+  <div class="note" style="margin-bottom:8px">Consumed on work orders but absent from the material master — candidates for the assessment tool.</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">${ needs.length ? needs.map(mn=>{ const has=MATBYMN[String(mn)]; return `<span class="badge" style="cursor:${has?'pointer':'default'};color:${has?'var(--map)':'var(--text-m)'}" ${has?`onclick="partView('${esc(String(mn))}')"`:''}>${esc(mn)}</span>`; }).join('') : '<span class="note">None — every consumed material is in the master.</span>' }</div>
+  <button class="ghost" onclick="goHome()">← home</button>`;
+  unitSearch(LASTUQ);
+}
+
+/* ═══ MODE 4 · DATA & SETTINGS ═══ */
+function dataHome(){
+  crumb('Data & Settings'); here('data', dataHome);
+  const m=DATA.meta||{}, c=DATA.counts||{}, sb=DATA.scoreboard||null;
   let sbHtml='';
   if(sb){
-    const tot=sb.retireSkus||0;
-    const seg=(n,cls,lbl)=>{ const pct=tot?Math.round(100*n/tot):0; return pct? `<span style="width:${pct}%;background:${cls}">${pct>7?n:''}</span>`:''; };
-    sbHtml = `<div class="card"><h3>Removal scoreboard — duplicate disposition</h3>
-      <div class="kpis" style="margin-bottom:10px">
+    const tot=sb.retireSkus||0; const seg=(n,col)=>{ const pct=tot?Math.round(100*n/tot):0; return pct?`<span style="width:${pct}%;background:${col}">${pct>7?n:''}</span>`:''; };
+    sbHtml = `<div class="card" style="margin-bottom:12px"><div class="fh" style="color:var(--core)">Removal scoreboard</div>
+      <div class="kpis">
         <div class="kpi ok"><div class="n">${sb.pctEliminated}%</div><div class="l">eliminated</div></div>
         <div class="kpi crit"><div class="n">${sb.reorderRisk}</div><div class="l">reorder-on-retire</div></div>
         <div class="kpi ok"><div class="n">${sb.runningDown}</div><div class="l">running-down</div></div>
-        <div class="kpi"><div class="n">${sb.retireSkus}</div><div class="l">retire SKUs · ${sb.families} families</div></div>
+        <div class="kpi"><div class="n">${sb.retireSkus}</div><div class="l">retire SKUs · ${sb.families} fam</div></div>
       </div>
-      <div class="bar">${seg(sb.eliminated,'var(--dim)')}${seg(sb.runningDown,'var(--ok)')}${seg(sb.reorderRisk,'var(--crit)')}</div>
-      <div class="legend"><span><i style="background:var(--dim)"></i>eliminated (0 stock)</span><span><i style="background:var(--ok)"></i>running-down</span><span><i style="background:var(--crit)"></i>reorder-on-retire</span></div>
+      <div class="bar">${seg(sb.eliminated,'var(--text-d)')}${seg(sb.runningDown,'var(--ok)')}${seg(sb.reorderRisk,'var(--crit)')}</div>
       <div class="note">${nf(sb.onHandInRetire)} units on-hand tied in retired numbers to run down${sb.provisionalFamilies?` · ${sb.provisionalFamilies} family(ies) “no technical preference”`:''}.</div></div>`;
   }
-  $('#view').innerHTML = `
-    <div class="kpis">${kp.map(([l,n,cls])=>`<div class="kpi ${cls}"><div class="n">${nf(n)}</div><div class="l">${l}</div></div>`).join('')}</div>
-    ${sbHtml || '<div class="card"><h3>Removal scoreboard</h3><div class="note">No disposition data in this dataset (load field captures in the engine to populate it).</div></div>'}
-    <div class="card"><h3>Dataset</h3><div class="kv">
-      <div class="k">Schema</div><div class="v mono">v${esc(DATA.schemaVersion||'?')}</div>
-      <div class="k">Client</div><div class="v">${esc(m.clientCode||'—')}${m.site?' · '+esc(m.site):''}</div>
-      <div class="k">Generated</div><div class="v mono">${esc(m.generatedAt||'—')}</div>
-      <div class="k">Engine phase</div><div class="v">${esc(m.phase||'—')}</div>
-      <div class="k">Sources</div><div class="v mono" style="font-size:11.5px">${Object.values(m.sourceFiles||{}).filter(Boolean).map(esc).join('<br>')||'—'}</div>
-    </div></div>`;
+  M.innerHTML = `
+  <h2 style="color:var(--core)">Data &amp; settings</h2>
+  ${sbHtml}
+  <div class="card" style="margin-bottom:12px"><div class="fh" style="color:var(--core)">Dataset</div><div class="kv">
+    <div class="k">Schema</div><div class="v">v${esc(DATA.schemaVersion||'?')}</div>
+    <div class="k">Client</div><div class="v">${esc(m.clientCode||'—')}${m.site?' · '+esc(m.site):''}</div>
+    <div class="k">Generated</div><div class="v">${esc(m.generatedAt||'—')}</div>
+    <div class="k">Engine phase</div><div class="v">${esc(m.phase||'—')}</div>
+    <div class="k">Counts</div><div class="v">${nf(c.materials||0)} parts · ${nf(c.families||0)} families · ${nf(c.dispositions||0)} dispositions · ${nf(c.needsIdentification||0)} need ID</div>
+    <div class="k">Sources</div><div class="v" style="font-family:var(--f-mono);font-size:11.5px">${Object.values(m.sourceFiles||{}).filter(Boolean).map(esc).join('<br>')||'—'}</div>
+    <div class="k">Storage</div><div class="v">${esc($('#saveInd').textContent||'not saved')} — kept in this browser (IndexedDB)</div>
+  </div></div>
+  <div class="btnrow">
+    <button class="primary core" onclick="pick()">⤒ Load / swap dataset</button>
+    <button class="ghost" onclick="exportJson()">⤓ Export JSON</button>
+    <button class="ghost" onclick="clearSaved()">⌫ Clear saved dataset</button>
+  </div>
+  <div class="note">“Clear” forgets the dataset saved in this browser and returns to the load screen. Downloaded files on disk are unaffected.</div>
+  <button class="ghost" onclick="goHome()">← home</button>`;
 }
 
-function renderMaterials(){
-  const cols=[['mn','Material'],['desc','Description'],['net_consumed','Net',1],['on_hand','On hand',1],['mrp_type','MRP'],['duplicate_group','Dup group'],['disposition','Disposition']];
-  let rows=(DATA.materials||[]).slice();
-  if(q){ const s=q.toLowerCase(); rows=rows.filter(m=> String(m.material).toLowerCase().includes(s) || String(m.description||'').toLowerCase().includes(s)); }
-  rows.sort((a,b)=>{ const k=sortK; let x=a[k], y=b[k]; if(k==='mn'){x=a.material;y=b.material;} if(typeof x==='string'||typeof y==='string'){x=String(x||'').toLowerCase();y=String(y||'').toLowerCase();return sortDir*(x<y?-1:x>y?1:0);} return sortDir*((x||0)-(y||0)); });
-  const cap=600, show=rows.slice(0,cap);
-  const dpill=d=> d==='reorder_risk'?'<span class="pill risk">reorder</span>':d==='running_down'?'<span class="pill run">running-down</span>':d==='eliminated'?'<span class="pill elim">eliminated</span>':'';
-  $('#view').innerHTML = `
-    <div class="row"><input class="search" id="q" placeholder="filter material / description…" value="${esc(q)}"><span class="note">${nf(rows.length)} materials${rows.length>cap?` (showing ${cap})`:''}</span></div>
-    <div class="tblwrap"><table><thead><tr>
-      ${cols.map(([k,l,n])=>`<th data-k="${k}" class="${n?'num':''}">${l}</th>`).join('')}
-    </tr></thead><tbody>
-      ${show.map(m=>`<tr>
-        <td class="mn" data-mn="${esc(m.material)}">${esc(m.material)}</td>
-        <td>${esc(m.description||'')}</td>
-        <td class="num">${nf(m.net_consumed)}</td>
-        <td class="num">${m.on_hand==null?'':nf(m.on_hand)}</td>
-        <td class="mono" style="font-family:var(--mono)">${esc(m.mrp_type||'')}</td>
-        <td>${esc(m.duplicate_group||'')}</td>
-        <td>${dpill(m.disposition)}</td></tr>`).join('')}
-    </tbody></table></div>`;
-  $('#q').addEventListener('input', e=>{ q=e.target.value; const p=e.target.selectionStart; renderMaterials(); const nq=$('#q'); nq.focus(); nq.setSelectionRange(p,p); });
-  document.querySelectorAll('#view th').forEach(th=>th.addEventListener('click',()=>{ const k=th.dataset.k; if(sortK===k) sortDir=-sortDir; else{ sortK=k; sortDir=(k==='mn'||k==='desc'||k==='mrp_type'||k==='duplicate_group'||k==='disposition')?1:-1; } renderMaterials(); }));
-  document.querySelectorAll('#view td.mn').forEach(td=>td.addEventListener('click',()=>openMaterial(td.dataset.mn)));
-}
-
-function openMaterial(mn){
-  const m=(DATA.materials||[]).find(x=>String(x.material)===String(mn)); if(!m) return;
-  const wu=(m.where_used||[]);
-  $('#drawerBody').innerHTML = `
-    <div style="font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.1em">SAP# ${esc(m.material)}</div>
-    <h2>${esc(m.pn||m.description||m.material)}</h2>
-    <div style="color:var(--muted);font-size:13px;margin-top:2px">${esc(m.traced_brand?m.traced_brand+' · ':'')}${esc(m.description||'')}</div>
-    <div class="kv">
-      <div class="k">Net consumed</div><div class="v">${nf(m.net_consumed)}</div>
-      <div class="k">On hand</div><div class="v">${m.on_hand==null?'—':nf(m.on_hand)}</div>
-      <div class="k">MRP / ROP / Max</div><div class="v mono">${esc(m.mrp_type||'—')} · ${m.rop==null?'—':m.rop} · ${m.max==null?'—':m.max}</div>
-      <div class="k">Vendor PN</div><div class="v mono">${esc(m.pn||'—')}</div>
-      <div class="k">Duplicate group</div><div class="v">${esc(m.duplicate_group||'—')}</div>
-      ${m.disposition?`<div class="k">Disposition</div><div class="v">${esc(m.disposition)}</div>`:''}
-      ${m.identified===false?`<div class="k">Identity</div><div class="v" style="color:var(--amber)">not in master — needs identification</div>`:''}
-    </div>
-    <h3 style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--greenb);margin:16px 0 6px">Where used — ${wu.length} unit${wu.length!==1?'s':''}</h3>
-    <div class="wu">${wu.slice(0,40).map(u=>`<div class="u"><div class="uh"><span>${esc(u.unit)}</span><b>${nf(u.qty)}</b></div>${(u.wos||[]).slice(0,6).map(w=>`<div class="wos">${esc(w[0])} · ${nf(w[1])} · ${esc(w[2])} · ${esc(w[3]||'')}</div>`).join('')}</div>`).join('') || '<div class="note">No work-order issues recorded.</div>'}</div>`;
-  $('#drawer').classList.add('open');
-}
-$('#drawerX').addEventListener('click',()=>$('#drawer').classList.remove('open'));
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('#drawer').classList.remove('open'); });
-
-function renderFamilies(){
-  const fams=(DATA.families||[]);
-  const vp=v=> v==='SAME'?'<span class="pill same">SAME → merge</span>':v==='SPLIT'?'<span class="pill split">SPLIT</span>':'<span class="pill">'+esc(v)+'</span>';
-  $('#view').innerHTML = fams.length ? `<div class="grid2">${fams.map(f=>`
-    <div class="fam"><div class="fh"><span class="fid">${esc(f.family_id)}</span>${vp(f.verdict)}${f.provisional?'<span class="pill prov">no tech pref</span>':''}</div>
-      ${(f.members||[]).map(mm=>`<div class="memb"><span>${esc(mm.material)}</span><span class="${mm.keep?'keep':'ret'}">${mm.keep?'KEEP':'retire'} · pile ${esc(mm.pile)}</span></div>`).join('')}
-      <div class="note">${f.tech?('by '+esc(f.tech)+' · '):''}${f.ts?String(f.ts).slice(0,10):''}${f.site_answer?' · “'+esc(f.site_answer)+'”':''}</div>
-    </div>`).join('')}</div>`
-    : '<div class="card"><h3>Families</h3><div class="note">No field-verified families in this dataset yet.</div></div>';
-}
-
-function renderNeeds(){
-  const n=(DATA.needs_identification||[]);
-  $('#view').innerHTML = `<div class="card"><h3>Needs identification — ${n.length}</h3>
-    <div class="note" style="margin-bottom:12px">Materials consumed on work orders but absent from the material master — candidates for the assessment tool.</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px">${n.map(mn=>`<span class="pill" style="cursor:pointer;color:var(--map)" onclick="(${''})">${esc(mn)}</span>`).join('') || '<span class="note">None — every consumed material is in the master.</span>'}</div></div>`;
-}
+/* ── init: restore last dataset, else show load ── */
+Store.get(STORE_KEY).then(rec=>{
+  if(rec && rec.d && Array.isArray(rec.d.materials)){ ingest(rec.d, rec.name, {restored:true}); }
+  else goHome();
+}).catch(()=>goHome());
 </script>
 </body>
 </html>

@@ -2,383 +2,502 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Calibre Map — Analysis Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --void:#0A0D1A; --deep:#040E1C; --surface:#0C2D3B; --surface2:#091F2D; --elevated:#164049;
-    --border:#1d3a44; --line:rgba(31,206,216,.14);
-    --text:#F0F4F3; --text2:#D6DFDE; --muted:#9BABA8;
-    --green:#23B58A; --green2:#5AB69D; --cyan:#1FCED8; --navy:#0C2D3B;
-    --ok:#34D399; --warn:#FBBF24; --crit:#EF4444; --violet:#9B97E8;
-    --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
-    --body:'Barlow','Segoe UI',system-ui,sans-serif;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;background:var(--void);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.5}
-  a{color:var(--cyan)}
-  header{display:flex;align-items:center;gap:14px;padding:16px 24px;background:linear-gradient(90deg,var(--deep),var(--surface));border-bottom:1px solid var(--line)}
-  header .mark{width:34px;height:34px;flex:none}
-  header h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.3px}
-  header h1 small{display:block;font-weight:400;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--green2)}
-  .wrap{max-width:1160px;margin:0 auto;padding:22px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:18px}
-  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green);margin:0 0 14px;font-weight:700}
-  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-  @media(max-width:720px){.grid{grid-template-columns:1fr}}
-  .drop{border:1px dashed var(--border);border-radius:6px;padding:12px 14px;background:var(--surface2);transition:.15s}
-  .drop.set{border-color:var(--green);border-style:solid}
-  .drop.req label b::after{content:' *';color:var(--green)}
-  .drop label{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}
-  .drop label b{color:var(--text);font-size:13px;font-weight:600}
-  .drop input{font-size:12px;color:var(--text2);width:100%}
-  .drop .fn{font-family:var(--mono);font-size:11px;color:var(--green2);margin-top:6px;word-break:break-all;min-height:14px}
-  .btn{background:var(--green);color:#062018;border:none;border-radius:6px;padding:10px 22px;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--body)}
-  .btn:disabled{opacity:.4;cursor:not-allowed}
-  .btn.ghost{background:transparent;color:var(--cyan);border:1px solid var(--cyan)}
-  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .status{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:12px;min-height:16px}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}}
-  .kpi{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:6px;padding:12px 14px}
-  .kpi .n{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--text)}
-  .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:3px}
-  .valid{border-left-color:var(--muted)}
-  .valid.pass{border-left-color:var(--ok)} .valid.fail{border-left-color:var(--crit)}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
-  th{background:var(--elevated);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text);cursor:pointer;position:sticky;top:0}
-  th.num,td.num{text-align:right;font-family:var(--mono)}
-  td.mn{font-family:var(--mono);color:var(--cyan)}
-  tbody tr:hover{background:rgba(31,206,216,.05)}
-  .tblwrap{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:6px}
-  .search{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:13px;width:240px}
-  .muted{color:var(--muted)} .mono{font-family:var(--mono)}
-  .pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:3px;background:rgba(31,206,216,.1);color:var(--cyan);border:1px solid var(--line)}
-  .note{font-size:12px;color:var(--muted);margin-top:8px}
-  details summary{cursor:pointer;color:var(--cyan);font-size:12px}
-  .hidden{display:none}
+/* ═══════════════════════════════════════════════════════════════════════════
+   Calibre Map · Analysis Engine — same app shell as the field app + viewer.
+   4-tile home, per-mode accents, green brand chrome, screen nav. The analyst
+   tool that turns SAP extracts + field captures into the canonical dataset.
+   engine.js (validated 1428/1428) is untouched — this file is shell + wiring.
+═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  --void:#0A0D1A; --deep:#04101d; --surface:#080C14; --chrome:#14161D; --border:#2A2D3A;
+  --text:#E8E9ED; --text-m:#8B8FA3; --text-d:#5C6078;
+  --verify:#BA7517; --verify-t:#E0A94A; --map:#378ADD; --map-t:#5AA2EA; --equip:#1D9E75; --equip-t:#2FBE8E; --core:#9B97E8;
+  --ok:#34D399; --warn:#FBBF24; --crit:#EF4444;
+  --f-disp:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --f-head:'Rajdhani','Segoe UI',Arial,sans-serif;
+  --f-body:'Barlow','Segoe UI',Arial,sans-serif;
+  --f-mono:'JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--f-body);background:var(--void);color:var(--text);min-height:100vh;font-size:15px}
+a{color:var(--map);text-decoration:none}
+
+header{position:sticky;top:0;z-index:50;background:rgba(4,16,29,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px}
+header .logo{display:flex;align-items:center;gap:9px;cursor:pointer}
+header .cvmark{width:26px;height:26px;flex:none;filter:drop-shadow(0 0 5px rgba(35,181,160,.5))}
+header .wm{font-family:var(--f-disp);font-weight:700;font-size:18px;letter-spacing:.15em;line-height:1;display:inline-flex;align-items:baseline}
+header .wm b{color:var(--text)} header .wm i{font-style:normal;margin-left:.34em;background:linear-gradient(90deg,#3FE0AE,#1C946E);-webkit-background-clip:text;background-clip:text;color:transparent}
+header .wm .sub{font-family:var(--f-mono);font-size:9px;letter-spacing:.15em;color:var(--map);margin-left:10px;border:1px solid var(--border);padding:2px 6px;align-self:center}
+header .crumb{font-family:var(--f-mono);font-size:10.5px;color:var(--text-d);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;letter-spacing:.04em}
+header button{background:var(--chrome);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px;font-family:var(--f-head);font-weight:600;cursor:pointer;min-height:38px;transition:border-color .15s}
+header button:hover{border-color:var(--text-d)}
+header .navlink{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-d);padding:8px 10px;border:1px solid transparent;border-radius:8px}
+header .navlink:hover{color:var(--map);border-color:var(--border)}
+
+main{padding:16px;max-width:1080px;margin:0 auto;padding-bottom:80px}
+h2{font-family:var(--f-disp);font-size:30px;margin:6px 0 14px;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+h3{font-family:var(--f-head);font-size:14px;margin:16px 0 8px;color:var(--text-m);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.eyebrow-mono{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-d)}
+.note{font-size:12px;color:var(--text-d);line-height:1.55;margin:8px 0}
+.muted{color:var(--text-m)} .mono{font-family:var(--f-mono)}
+
+/* home tiles */
+.modes{display:grid;gap:12px;margin-top:10px}
+@media(min-width:640px){.modes{grid-template-columns:1fr 1fr}}
+.modecard{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 18px;cursor:pointer;transition:border-color .15s,transform .15s}
+.modecard:hover{transform:translateY(-2px)}
+.modecard.off{opacity:.55;cursor:default} .modecard.off:hover{transform:none}
+.modecard .eyebrow{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.65;margin-bottom:6px}
+.modecard .name{font-family:var(--f-disp);font-size:24px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;margin-bottom:6px}
+.modecard .desc{font-size:13px;color:var(--text-m);line-height:1.5}
+.modecard .glow{position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;filter:blur(48px);opacity:.18}
+.modecard .step{position:absolute;top:12px;right:14px;font-family:var(--f-mono);font-size:9px;letter-spacing:.1em;color:var(--text-d)}
+.mc-map{border-color:rgba(55,138,221,.3)} .mc-map:hover{border-color:var(--map)} .mc-map .name,.mc-map .eyebrow{color:var(--map)} .mc-map .glow{background:var(--map)}
+.mc-equip{border-color:rgba(29,158,117,.3)} .mc-equip:hover{border-color:var(--equip)} .mc-equip .name,.mc-equip .eyebrow{color:var(--equip-t)} .mc-equip .glow{background:var(--equip)}
+.mc-verify{border-color:rgba(186,117,23,.3)} .mc-verify:hover{border-color:var(--verify)} .mc-verify .name,.mc-verify .eyebrow{color:var(--verify-t)} .mc-verify .glow{background:var(--verify)}
+.mc-data{border-color:rgba(155,151,232,.3)} .mc-data:hover{border-color:var(--core)} .mc-data .name,.mc-data .eyebrow{color:var(--core)} .mc-data .glow{background:var(--core)}
+
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:16px 0}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.stat .n{font-family:var(--f-disp);font-size:26px;font-weight:700;line-height:1} .stat .l{font-size:10px;color:var(--text-d);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+/* upload / derive */
+.group-label{font-family:var(--f-mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--map);margin:0 0 10px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.group-label span{font-family:var(--f-body);font-size:11.5px;letter-spacing:0;color:var(--text-m);text-transform:none}
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.upload-grid{grid-template-columns:1fr}}
+.drop{display:block;position:relative;text-align:left;cursor:pointer;background:var(--surface);border:2px dashed var(--border);border-radius:12px;padding:16px;transition:border-color .15s,background .15s}
+.drop:hover,.drop.dragover{border-color:var(--map);background:rgba(55,138,221,.05)}
+.drop.set{border-style:solid;border-color:var(--equip)}
+.drop .name{font-family:var(--f-head);font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:var(--text);margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.drop.req .name::after{content:'REQUIRED';font-family:var(--f-mono);font-size:8.5px;letter-spacing:.1em;color:var(--map);border:1px solid var(--border);padding:1px 5px}
+.drop .name em{font-family:var(--f-mono);font-size:9px;font-style:normal;text-transform:uppercase;letter-spacing:.08em;color:var(--text-d)}
+.drop .name em.soon{color:var(--core)}
+.drop .hint{font-family:var(--f-mono);font-size:10.5px;color:var(--text-m);line-height:1.5}
+.drop .file{font-family:var(--f-mono);font-size:10.5px;color:var(--text-d);margin-top:8px;display:block}
+.drop .fn{font-family:var(--f-mono);font-size:11px;color:var(--equip-t);margin-top:6px;min-height:14px;word-break:break-all}
+.drop input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.drop.planned{cursor:default;opacity:.5} .drop.planned:hover{border-color:var(--border);background:var(--surface)}
+.group-div{height:1px;background:var(--border);border:none;margin:22px 0}
+
+.primary{width:100%;min-height:48px;background:var(--map);color:#06121f;border:none;border-radius:12px;font-family:var(--f-head);font-size:15px;font-weight:700;cursor:pointer;transition:filter .15s}
+.primary:hover{filter:brightness(1.1)} .primary:disabled{opacity:.4;cursor:not-allowed}
+.primary.equip{background:var(--equip)} .primary.core{background:var(--core)}
+.ghost{width:100%;min-height:44px;background:transparent;border:1px solid var(--border);border-radius:12px;color:var(--text-m);font-family:var(--f-head);font-weight:600;font-size:13px;cursor:pointer;transition:border-color .15s}
+.ghost:hover{border-color:var(--text-d);color:var(--text)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px} .btnrow .ghost,.btnrow .primary{flex:1;min-width:150px}
+.status{font-family:var(--f-mono);font-size:11.5px;color:var(--text-m);margin-top:14px;min-height:16px}
+.rule{font-family:var(--f-mono);font-size:10.5px;color:var(--text-d)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.card .fh{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px;color:var(--map)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--chrome);border:1px solid var(--border);border-left:3px solid var(--map);border-radius:10px;padding:13px 15px}
+.kpi .n{font-family:var(--f-disp);font-size:28px;font-weight:700;line-height:1} .kpi .l{font-family:var(--f-mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-m);margin-top:5px}
+.kpi.ok{border-left-color:var(--ok)} .kpi.ok .n{color:var(--ok)}
+.kpi.crit{border-left-color:var(--crit)} .kpi.crit .n{color:var(--crit)}
+.kpi.core{border-left-color:var(--core)} .kpi.violet .n{color:var(--core)}
+.bar{display:flex;height:24px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin:8px 0}
+.bar span{display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:11px;color:#04121f;font-weight:500;min-width:0}
+
+.search{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-family:var(--f-mono);font-size:13px;width:260px;max-width:100%;outline:none}
+.search:focus{border-color:var(--map)}
+.tblwrap{max-height:60vh;overflow:auto;border:1px solid var(--border);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-family:var(--f-body);font-size:13px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid rgba(139,143,163,.08)}
+th{background:var(--chrome);color:var(--text-m);font-family:var(--f-mono);font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;position:sticky;top:0}
+th:hover{color:var(--map)} td{background:var(--surface);color:var(--text)}
+tbody tr:nth-child(even) td{background:#0a1018}
+th.num,td.num{text-align:right;font-family:var(--f-mono)}
+td.mn{font-family:var(--f-mono);color:var(--map);font-weight:500}
+tbody tr:hover td{background:rgba(55,138,221,.06)}
+.pill{display:inline-block;font-family:var(--f-mono);font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(55,138,221,.1);color:var(--map);border:1px solid var(--border)}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:7px 12px;font-size:13px}
+.kv .k{font-family:var(--f-mono);color:var(--text-d);text-transform:uppercase;font-size:10.5px;letter-spacing:.04em;padding-top:2px} .kv .v{color:var(--text)}
+details summary{cursor:pointer;color:var(--map);font-family:var(--f-mono);font-size:11px;margin-top:6px}
+.qrow{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+@media(max-width:640px){.qrow{grid-template-columns:1fr}}
+.qrow .qid{font-family:var(--f-mono);font-size:12.5px;color:var(--map)}
+.qrow .qd{font-size:12.5px;color:var(--text-m);margin-top:2px}
+.sel{background:var(--chrome);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--f-head);font-weight:600;font-size:12.5px;padding:8px 10px;cursor:pointer}
+.sel:focus{outline:none;border-color:var(--verify-t)}
+.qsave{background:var(--verify);color:#0A0D1A;border:none;border-radius:8px;font-family:var(--f-head);font-weight:700;font-size:12.5px;padding:9px 16px;cursor:pointer;white-space:nowrap}
+.qsave:hover{filter:brightness(1.1)}
+.clog{font-family:var(--f-mono);font-size:11.5px;color:var(--text-m);padding:6px 0;border-top:1px dashed var(--border)}
+.clog b{color:var(--equip-t)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--chrome);border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:13px;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.hidden{display:none}
 </style>
 </head>
 <body>
 <header>
-  <svg class="mark" viewBox="0 0 720 720" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <polygon points="660,360 510,619.8 210,619.8 60,360 210,100.2 510,100.2" fill="none" stroke="#23B58A" stroke-width="26" stroke-linejoin="round"/>
-    <g stroke="#23B58A" stroke-width="20" stroke-linecap="round"><line x1="360" y1="360" x2="360" y2="220"/><line x1="360" y1="360" x2="480" y2="430"/><line x1="360" y1="360" x2="240" y2="430"/></g>
-    <g fill="#23B58A"><circle cx="360" cy="220" r="34"/><circle cx="480" cy="430" r="28"/><circle cx="240" cy="430" r="28"/></g>
-    <circle cx="360" cy="360" r="30" fill="#0C2D3B" stroke="#23B58A" stroke-width="14"/>
-  </svg>
-  <h1>Calibre Map<small>Analysis Engine</small></h1>
+  <div class="logo" onclick="goHome()" aria-label="Calibre Map — home">
+    <svg class="cvmark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><defs><linearGradient id="mapg" x1="5" y1="5" x2="27" y2="27" gradientUnits="userSpaceOnUse"><stop stop-color="#3FE0AE"/><stop offset="1" stop-color="#188A66"/></linearGradient></defs><g stroke="url(#mapg)" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="7" y2="8"/><line x1="16" y1="16" x2="25" y2="9"/><line x1="16" y1="16" x2="8" y2="24"/><line x1="16" y1="16" x2="24" y2="23"/></g><g fill="url(#mapg)"><circle cx="16" cy="16" r="3.5"/><circle cx="7" cy="8" r="2"/><circle cx="25" cy="9" r="2"/><circle cx="8" cy="24" r="2"/><circle cx="24" cy="23" r="2"/></g></svg>
+    <span class="wm"><b>CALIBRE</b><i>MAP</i><span class="sub">Analysis Engine</span></span>
+  </div>
+  <div class="crumb" id="crumb">Analysis Engine</div>
+  <button id="backbtn" onclick="goBack()" style="display:none">&larr; Back</button>
+  <button onclick="goHome()">Home</button>
+  <a class="navlink" href="viewer.html" title="Open the Viewer">Viewer</a>
 </header>
-
-<div class="wrap">
-
-  <div class="card">
-    <h2>1 · Load the transactional feedstock</h2>
-    <div class="grid">
-      <div class="drop req" id="d_mb51"><label><b>MB51</b> — WO consumption extract (.xlsx)</label><input type="file" accept=".xlsx,.xls" id="f_mb51"><div class="fn"></div></div>
-      <div class="drop req" id="d_iw39"><label><b>IW39</b> — work-order list (.xlsx)</label><input type="file" accept=".xlsx,.xls" id="f_iw39"><div class="fn"></div></div>
-      <div class="drop" id="d_invmstr"><label><b>INV MSTR</b> — inventory master, optional (.xlsx) · on-hand, MRP, ROP, Max</label><input type="file" accept=".xlsx,.xls" id="f_invmstr"><div class="fn"></div></div>
-      <div class="drop" id="d_master"><label><b>Master / traced register</b> — optional (.csv) · description, brand, dup group</label><input type="file" accept=".csv,.xlsx,.xls" id="f_master"><div class="fn"></div></div>
-      <div class="drop" id="d_captures"><label><b>Field captures</b> — exported bundles, optional (.json, multiple)</label><input type="file" accept=".json" id="f_captures" multiple><div class="fn"></div></div>
-      <div class="drop" id="d_fleet"><label><b>Fleet register</b> — unit → group, optional (.csv/.xlsx)</label><input type="file" accept=".csv,.xlsx,.xls" id="f_fleet"><div class="fn"></div></div>
-      <div class="drop" id="d_gold"><label><b>Golden CSV</b> — consumption_by_unit.csv, optional self-check</label><input type="file" accept=".csv" id="f_gold"><div class="fn"></div></div>
-    </div>
-    <div class="row" style="margin-top:16px">
-      <button class="btn" id="run" disabled>Run derivation</button>
-      <span class="muted" style="font-size:12px">Net consumed = material-level net of MB51 261/262, flipped; kept where net &gt; 0.</span>
-    </div>
-    <div class="status" id="status">Waiting for MB51 + IW39…</div>
-  </div>
-
-  <div id="results" class="hidden">
-    <div class="card">
-      <h2>2 · Results</h2>
-      <div class="kpis" id="kpis"></div>
-      <div id="verifBox"></div>
-      <div id="scoreBox"></div>
-      <div id="canonBox"></div>
-      <div id="validBox"></div>
-    </div>
-
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-bottom:12px">
-        <h2 style="margin:0">3 · Consumption by material</h2>
-        <div class="row">
-          <input class="search" id="search" placeholder="filter material / desc…">
-          <button class="btn ghost" id="export">Export JSON</button>
-        </div>
-      </div>
-      <div class="tblwrap">
-        <table id="tbl">
-          <thead><tr>
-            <th data-k="mn">Material</th><th data-k="desc">Description</th>
-            <th data-k="net" class="num">Net consumed</th>
-            <th data-k="onHand" class="num">On hand</th>
-            <th data-k="mrp">MRP</th>
-            <th data-k="units" class="num">Units</th>
-            <th data-k="dup">Dup group</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="note" id="tblnote"></div>
-    </div>
-  </div>
-
-  <p class="note">Runs entirely in your browser — nothing is uploaded. Load client extracts locally; export the JSON and move it by USB. Then open it in the <a href="viewer.html" style="color:var(--greenb)">Viewer →</a>. <span class="pill">v0.1 · engine <span id="ev"></span></span></p>
-</div>
+<main id="main"></main>
+<div class="toast" id="toast"></div>
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="numacore_lib.js"></script>
 <script src="engine.js"></script>
 <script>
 const $ = s => document.querySelector(s);
+const M = document.getElementById('main');
+const esc = s => (window.NumaCoreLib&&NumaCoreLib.esc)?NumaCoreLib.esc(s):String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2400); }
+
+/* ── engine state ── */
 const files = { mb51:null, iw39:null, invmstr:null, master:null, captures:null, fleet:null, gold:null };
-let derived = null, tableRows = [], sortK = 'net', sortDir = -1;
-document.getElementById('ev').textContent = CalibreEngine.version;
+let DERIVED=null, TABLEROWS=[], SB=null, VERIF=null, VALID=null, sortK='net', sortDir=-1, tq='';
 
-function wire(id, key){
-  const inp = $('#f_'+key);
-  inp.addEventListener('change', e=>{
-    const fl = e.target.files;
-    if (inp.multiple){ files[key] = [...fl]; } else { files[key] = fl[0]||null; }
-    const has = inp.multiple ? files[key].length : !!files[key];
-    const d = $('#d_'+key); d.classList.toggle('set', !!has);
-    d.querySelector('.fn').textContent = inp.multiple ? (has? has+' file(s)':'') : (files[key]? files[key].name : '');
-    $('#run').disabled = !(files.mb51 && files.iw39);
-    if (has) setStatus('Ready to run.');
+/* ── nav ── */
+let NAV=[];
+function crumb(t){ $('#crumb').textContent=t; }
+function here(id,fn){ NAV.push({id,fn}); $('#backbtn').style.display = NAV.length>1?'':'none'; }
+function goBack(){ if(NAV.length<=1){ goHome(); return; } NAV.pop(); const p=NAV[NAV.length-1]; NAV.pop(); p.fn(); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&NAV.length>1) goBack(); });
+
+/* ── HOME ── */
+function goHome(){
+  NAV=[]; here('home',goHome); $('#backbtn').style.display='none';
+  crumb('');
+  const done=!!DERIVED, c=(DERIVED&&DERIVED.counts)||{};
+  const tile=(cls,step,name,desc,fn,active)=>`<div class="modecard ${cls}${active?'':' off'}" ${active?`onclick="${fn}"`:''}><div class="glow"></div><div class="step">${step}</div>
+    <div class="eyebrow">${step}</div><div class="name">${name}</div><div class="desc">${desc}</div></div>`;
+  M.innerHTML = `
+  <h2>What are we deriving today?</h2>
+  <div class="modes">
+    ${tile('mc-map','Step 1','Load &amp; Derive','Drop the SAP extracts and field captures, then run the deterministic derivation — net consumption, enrichment, verification, scoreboard.','deriveHome()',true)}
+    ${tile('mc-equip','Step 2','Consumption','Net consumed per material with where-used — the recomputed consumption_by_unit, searchable.', 'consumptionScreen()', done)}
+    ${tile('mc-verify','Step 3','Duplicates &amp; Scoreboard','Verification merge and the removal scoreboard — % eliminated, reorder-on-retire, running-down.','scoreboardScreen()', done)}
+    ${tile('mc-data','Step 4','Dataset &amp; Export','The one canonical JSON — counts, sources, schema. Export it and open it in the Viewer.','datasetScreen()', done)}
+    ${tile('mc-verify','Inbox','Query Inbox','Field flags on wrong part allocations land here. Correct an allocation once, in the canonical source — it flows to every surface.','queryInbox()', done)}
+  </div>
+  ${ done ? `<div class="statgrid">
+      <div class="stat"><div class="n">${(c.materials||0).toLocaleString()}</div><div class="l">materials</div></div>
+      <div class="stat"><div class="n">${(c.families||0).toLocaleString()}</div><div class="l">families</div></div>
+      <div class="stat"><div class="n">${(c.dispositions||0).toLocaleString()}</div><div class="l">dispositions</div></div>
+      <div class="stat"><div class="n">${(c.needsIdentification||0).toLocaleString()}</div><div class="l">need ID</div></div>
+    </div>
+    <div class="note">Derived · canonical schema v${esc(DERIVED.schemaVersion)} · phase ${esc(DERIVED.meta.phase)}. Steps 2–4 are live.</div>`
+   : `<div class="note">Nothing derived yet — start with <b style="color:var(--map)">Load &amp; Derive</b>. Everything runs in your browser; nothing is uploaded. <span class="pill">engine <span id="ev"></span></span></div>` }`;
+  const ev=$('#ev'); if(ev) ev.textContent=CalibreEngine.version;
+}
+
+/* ═══ STEP 1 · LOAD & DERIVE ═══ */
+function deriveHome(){
+  crumb('Load & Derive'); here('derive',deriveHome);
+  M.innerHTML = `
+  <h2 style="color:var(--map)">Load the feedstock</h2>
+  <div class="group-label">SAP downloads <span>Raw extracts pulled straight from SAP each refresh cycle.</span></div>
+  <div class="upload-grid">
+    ${drop('mb51','MB51','',true,'.xlsx,.xls','Material movements · Posting Date, Order, Material, Movement Type, Quantity. Movements 261 / 262, ≥ 12 months.','drag .xlsx / .xls here, or click')}
+    ${drop('iw39','IW39','',true,'.xlsx,.xls','Work-order list · Order → Sort Field. Maps each order to its consuming unit.','drag .xlsx / .xls here, or click')}
+    ${drop('invmstr','INV MSTR','optional',false,'.xlsx,.xls','Inventory master · on-hand, MRP type, ROP, Max, description, PN. Enables enrichment + scoreboard on-hand accuracy.','drag .xlsx / .xls here, or click')}
+    ${drop('fleet','Fleet Master','optional',false,'.csv,.xlsx,.xls','Equipment register · Unit → group / family label. Adds consumed-by-group roll-up.','drag .csv / .xlsx here, or click')}
+    <div class="drop planned"><div class="name">PR → PO history <em class="soon">planned</em></div>
+      <div class="hint">Purchase requisition → purchase order history · procurement lead time + replenishment cadence to sharpen the reorder-risk call. Slot reserved.</div>
+      <span class="file">not yet active</span></div>
+  </div>
+  <hr class="group-div">
+  <div class="group-label">Campaign inputs <span>Curated identity, field verification, and QA artifacts — not from SAP.</span></div>
+  <div class="upload-grid">
+    ${drop('master','Traced register','optional',false,'.csv,.xlsx,.xls','Curated identity master · description, brand, duplicate group (Group label).','drag .csv / .xlsx here, or click')}
+    ${drop('captures','Field captures','optional · multiple',false,'.json','Exported materialid_bundle_*.json from the field app · verdicts (SAME / SPLIT / ALL-DIFFERENT), keep / retire.','drag .json files here, or click',true)}
+    ${drop('gold','Golden CSV','optional · self-check',false,'.csv','consumption_by_unit.csv · validation only. Checks the derivation is exact — never enters the dataset.','drag .csv here, or click')}
+  </div>
+  <div class="btnrow"><button class="primary" id="run" disabled>Run derivation</button></div>
+  <div class="rule" style="margin-top:10px">Net consumed = material-level net of MB51 261 / 262, flipped; kept where net &gt; 0.</div>
+  <div class="status" id="status">Waiting for MB51 + IW39…</div>
+  <button class="ghost" style="margin-top:14px" onclick="goHome()">← home</button>`;
+  wireUploads();
+  $('#run').addEventListener('click', runDerivation);
+  refreshRunState();
+}
+function drop(key,name,tag,req,accept,hint,file,multiple){
+  return `<label class="drop ${req?'req':''}" id="d_${key}">
+    <div class="name">${name}${tag?` <em>${tag}</em>`:''}</div>
+    <div class="hint">${hint}</div>
+    <span class="file">${file}</span>
+    <div class="fn"></div>
+    <input type="file" accept="${accept}" id="f_${key}" ${multiple?'multiple':''}>
+  </label>`;
+}
+function wireUploads(){
+  ['mb51','iw39','invmstr','master','captures','fleet','gold'].forEach(key=>{
+    const inp=$('#f_'+key), d=$('#d_'+key); if(!inp||!d) return;
+    // reflect any prior selection kept in `files`
+    const cur=files[key], has=Array.isArray(cur)?cur.length:!!cur;
+    if(has){ d.classList.add('set'); d.querySelector('.fn').textContent = Array.isArray(cur)?(cur.length+' file(s) selected'):cur.name; }
+    inp.addEventListener('change', e=>{
+      const fl=e.target.files;
+      files[key] = inp.multiple ? [...fl] : (fl[0]||null);
+      const h = inp.multiple ? files[key].length : !!files[key];
+      d.classList.toggle('set', !!h);
+      d.querySelector('.fn').textContent = inp.multiple ? (h? h+' file(s) selected':'') : (files[key]?files[key].name:'');
+      refreshRunState(); if(h) setStatus('Ready to run.');
+    });
+    ['dragenter','dragover'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add('dragover');}));
+    ['dragleave','dragend','drop'].forEach(ev=>d.addEventListener(ev,()=>d.classList.remove('dragover')));
   });
 }
-['mb51','iw39','invmstr','master','captures','fleet','gold'].forEach(k=>wire(0,k));
+function refreshRunState(){ const r=$('#run'); if(r) r.disabled = !(files.mb51&&files.iw39); }
+function setStatus(t){ const s=$('#status'); if(s) s.textContent=t; }
 
-function setStatus(t){ $('#status').textContent = t; }
-
-function readXlsx(file){
-  return new Promise((res,rej)=>{
-    const r = new FileReader();
-    r.onload = ()=>{ try{
-      const wb = XLSX.read(new Uint8Array(r.result), {type:'array', cellDates:true});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      res(XLSX.utils.sheet_to_json(ws, {defval:null}));
-    }catch(err){ rej(err); } };
-    r.onerror = ()=>rej(new Error('read failed'));
-    r.readAsArrayBuffer(file);
-  });
-}
+/* ── readers ── */
+function readXlsx(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ try{ const wb=XLSX.read(new Uint8Array(r.result),{type:'array',cellDates:true}); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null})); }catch(err){ rej(err);} }; r.onerror=()=>rej(new Error('read failed')); r.readAsArrayBuffer(file); }); }
 function readText(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error('read failed')); r.readAsText(file); }); }
-
-function parseCSV(text){
-  const out=[]; let row=[],field='',i=0,q=false;
-  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+function parseCSV(text){ const out=[]; let row=[],field='',i=0,q=false; if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
   while(i<text.length){ const c=text[i];
-    if(q){ if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false; } else field+=c; }
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false;} else field+=c; }
     else { if(c==='"')q=true; else if(c===','){row.push(field);field='';} else if(c==='\r'){} else if(c==='\n'){row.push(field);out.push(row);row=[];field='';} else field+=c; }
-    i++;
-  }
-  if(field.length||row.length){row.push(field);out.push(row);}
-  return out;
-}
+    i++; }
+  if(field.length||row.length){row.push(field);out.push(row);} return out; }
+function csvToObjects(text){ const a=parseCSV(text); if(!a.length)return[]; const h=a[0].map(x=>String(x).trim()); return a.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;}); }
+function fleetMap(rows){ const m={}; if(!rows)return m; rows.forEach(r=>{ const u=String(r['Unit']||r['Sort Field']||'').trim(); if(!u)return; let g=String(r['Family']||'').trim(); if(!g)g=[r['Make'],r['Model']].map(x=>String(x||'').trim()).filter(Boolean).join(' '); if(g)m[u]=g; }); return m; }
 
-// build unit -> group label from a fleet register (Family col if present, else Make+Model)
-function fleetMap(rows){
-  const m={}; if(!rows) return m;
-  const has = k => rows[0] && Object.prototype.hasOwnProperty.call(rows[0],k);
-  rows.forEach(r=>{
-    const u = String(r['Unit']||r['Sort Field']||'').trim(); if(!u) return;
-    let g = String(r['Family']||'').trim();
-    if(!g){ g = [r['Make'],r['Model']].map(x=>String(x||'').trim()).filter(Boolean).join(' '); }
-    if(g) m[u]=g;
-  });
-  return m;
-}
-
-$('#run').addEventListener('click', async ()=>{
+/* ── the derivation (engine.js does the maths; this just orchestrates I/O) ── */
+async function runDerivation(){
   try{
     $('#run').disabled=true; setStatus('Reading MB51 + IW39…');
-    const [mb, iwRows] = await Promise.all([ readXlsx(files.mb51), readXlsx(files.iw39) ]);
+    const [mb,iwRows]=await Promise.all([readXlsx(files.mb51),readXlsx(files.iw39)]);
     setStatus('Deriving…');
-    const iw = CalibreEngine.indexIW39(iwRows);
-    const mats = CalibreEngine.derive(mb, iw);
-
-    // Phase 2 — enrich with inventory master + traced register (optional)
-    if (files.invmstr || files.master){
+    const iw=CalibreEngine.indexIW39(iwRows);
+    const mats=CalibreEngine.derive(mb,iw);
+    if(files.invmstr||files.master){
       setStatus('Enriching (INV MSTR / master)…');
-      const invBy = files.invmstr ? CalibreEngine.indexBy(await readXlsx(files.invmstr), 'Material') : {};
-      let trBy = {};
-      if (files.master){
-        const mr = files.master.name.toLowerCase().endsWith('.csv') ? csvToObjects(await readText(files.master)) : await readXlsx(files.master);
-        trBy = CalibreEngine.indexBy(mr, 'Material');
-      }
-      CalibreEngine.enrich(mats, { invByMat: invBy, tracedByMat: trBy });
+      const invBy = files.invmstr ? CalibreEngine.indexBy(await readXlsx(files.invmstr),'Material') : {};
+      let trBy={};
+      if(files.master){ const mr=files.master.name.toLowerCase().endsWith('.csv')?csvToObjects(await readText(files.master)):await readXlsx(files.master); trBy=CalibreEngine.indexBy(mr,'Material'); }
+      CalibreEngine.enrich(mats,{invByMat:invBy,tracedByMat:trBy});
     }
-
-    let fmap = {};
-    if (files.fleet){
-      const fr = files.fleet.name.toLowerCase().endsWith('.csv')
-        ? csvToObjects(await readText(files.fleet)) : await readXlsx(files.fleet);
-      fmap = fleetMap(fr);
-    }
-
-    // consumption_by_unit view = materials with net>0
-    const rows = [];
-    Object.keys(mats).forEach(mn=>{
-      const m = mats[mn]; if (m.netAll <= 0) return;
-      const top = m.whereUsed[0];
-      rows.push({
-        mn, net:m.netAll, units:m.whereUsed.length,
-        onHand: m.onHand===''||m.onHand==null ? '' : m.onHand,
-        mrp: m.mrpType||'', dup: m.dupGroup||'',
-        top: top ? (top.unit+' ('+top.qty+')') : '',
-        byUnit: m.whereUsed.map(w=>w.unit+': '+w.qty).join('; '),
-        byGroup: files.fleet ? CalibreEngine.consumedByFamily(m, fmap) : '',
-        desc: m.description||'', _m:m
-      });
-    });
-
-    const enriched = !!(files.invmstr || files.master);
-    derived = { meta:{ tool:'calibre-analysis-engine', phase: enriched?2:1, generatedFrom:{mb51:files.mb51.name, iw39:files.iw39.name}, rule:'net consumed = material-level net of MB51 261/262 flipped; net>0' },
-                materials: rows.map(r=>{ const m=r._m; return {
-                  material:r.mn, description:r.desc||undefined, pn:m.pn||undefined,
-                  net_consumed:r.net, on_hand: enriched?m.onHand:undefined,
-                  mrp_type:m.mrpType||undefined, rop: enriched?m.rop:undefined, max: enriched?m.max:undefined,
-                  traced_brand:m.tracedBrand||undefined, duplicate_group:m.dupGroup||undefined,
-                  identified: m.identified,
-                  where_used: (m.whereUsed&&m.whereUsed.length)?m.whereUsed:undefined,
-                  consuming_units:r.units, consumed_by_unit:r.byUnit, consumed_by_group:r.byGroup||undefined }; }) };
-    tableRows = rows;
-
-    // Phase 3 — fold in field capture bundles (optional)
-    if (files.captures && files.captures.length){
+    let fmap={}, fleetRows=null;
+    if(files.fleet){ fleetRows=files.fleet.name.toLowerCase().endsWith('.csv')?csvToObjects(await readText(files.fleet)):await readXlsx(files.fleet); fmap=fleetMap(fleetRows); }
+    const rows=[];
+    Object.keys(mats).forEach(mn=>{ const m=mats[mn]; if(m.netAll<=0)return; const top=m.whereUsed[0];
+      rows.push({ mn, net:m.netAll, units:m.whereUsed.length, onHand:(m.onHand===''||m.onHand==null)?'':m.onHand,
+        mrp:m.mrpType||'', dup:m.dupGroup||'', byUnit:m.whereUsed.map(w=>w.unit+': '+w.qty).join('; '),
+        byGroup: files.fleet?CalibreEngine.consumedByFamily(m,fmap):'', desc:m.description||'', _m:m }); });
+    const enriched=!!(files.invmstr||files.master);
+    let derived={ meta:{ tool:'calibre-analysis-engine', phase:enriched?2:1, generatedFrom:{mb51:files.mb51.name,iw39:files.iw39.name}, rule:'net consumed = material-level net of MB51 261/262 flipped; net>0' },
+      materials: rows.map(r=>{ const m=r._m; return { material:r.mn, description:r.desc||undefined, pn:m.pn||undefined,
+        net_consumed:r.net, on_hand:enriched?m.onHand:undefined, mrp_type:m.mrpType||undefined, rop:enriched?m.rop:undefined, max:enriched?m.max:undefined,
+        traced_brand:m.tracedBrand||undefined, duplicate_group:m.dupGroup||undefined, identified:m.identified,
+        category:m.category||undefined, category_confidence:m.categoryConfidence||undefined, category_reason:m.categoryReason||undefined, fits:m.fits||undefined,
+        where_used:(m.whereUsed&&m.whereUsed.length)?m.whereUsed:undefined, consuming_units:r.units, consumed_by_unit:r.byUnit, consumed_by_group:r.byGroup||undefined }; }) };
+    TABLEROWS=rows;
+    VERIF=null; SB=null;
+    if(files.captures&&files.captures.length){
       setStatus('Merging field captures…');
-      const bundles = [];
-      for (const cf of files.captures){ try { bundles.push(JSON.parse(await readText(cf))); } catch(e){ console.warn('bad bundle', cf.name, e); } }
-      const vsum = CalibreEngine.mergeVerification(derived, bundles);
-      derived.meta.phase = 3;
-      renderVerification(vsum);
-      const sb = CalibreEngine.buildScoreboard(derived);
-      if (sb.rows.length){ derived.meta.phase = 4; renderScoreboard(sb); } else { $('#scoreBox').innerHTML = ''; }
-    } else { $('#verifBox').innerHTML = ''; $('#scoreBox').innerHTML = ''; }
-
-    renderKPIs(mats, rows, iw);
-    if (files.gold) await validate(mats); else $('#validBox').innerHTML='';
-    sortK='net'; sortDir=-1; renderTable();
-
-    // Phase 5 — assemble the one canonical dataset (the shared contract)
-    derived = CalibreEngine.assembleCanonical(derived, {
-      generatedAt: new Date().toISOString(),
-      sourceFiles: { mb51: files.mb51&&files.mb51.name, iw39: files.iw39&&files.iw39.name, invMstr: files.invmstr&&files.invmstr.name, master: files.master&&files.master.name },
-      phase: derived.meta.phase
-    });
-    renderCanonical(derived);
-
-    $('#results').classList.remove('hidden');
+      const bundles=[]; for(const cf of files.captures){ try{ bundles.push(JSON.parse(await readText(cf))); }catch(e){ console.warn('bad bundle',cf.name,e); } }
+      VERIF=CalibreEngine.mergeVerification(derived,bundles); derived.meta.phase=3;
+      const sb=CalibreEngine.buildScoreboard(derived); if(sb.rows.length){ derived.meta.phase=4; SB=sb; }
+    }
+    VALID=null;
+    if(files.gold){ VALID=await validate(mats); }
+    derived.fleet = fleetRows ? CalibreEngine.buildFleet(fleetRows) : [];
+    derived=CalibreEngine.assembleCanonical(derived,{ generatedAt:new Date().toISOString(),
+      sourceFiles:{ mb51:files.mb51&&files.mb51.name, iw39:files.iw39&&files.iw39.name, invMstr:files.invmstr&&files.invmstr.name, master:files.master&&files.master.name }, phase:derived.meta.phase });
+    DERIVED=derived; KPI_IW=Object.keys(iw.woUnit).length; KPI_SEEN=Object.keys(mats).length;
     setStatus('Done — '+rows.length+' materials with net consumption.');
+    toast('Derived '+rows.length.toLocaleString()+' materials'); goHome();
   }catch(err){ setStatus('Error: '+err.message); console.error(err); }
-  finally{ $('#run').disabled=false; }
-});
-
-function csvToObjects(text){
-  const a = parseCSV(text); if(!a.length) return [];
-  const h = a[0].map(x=>String(x).trim());
-  return a.slice(1).map(r=>{ const o={}; h.forEach((k,i)=>o[k]=r[i]); return o; });
+  finally{ const r=$('#run'); if(r) r.disabled=false; }
 }
-
-function renderKPIs(mats, rows, iw){
-  const totalNet = rows.reduce((s,r)=>s+r.net,0);
-  const kp = [
-    ['Materials (net &gt; 0)', rows.length.toLocaleString()],
-    ['Total net consumed', CalibreEngine.round1(totalNet).toLocaleString()],
-    ['Orders indexed (IW39)', Object.keys(iw.woUnit).length.toLocaleString()],
-    ['Materials seen (incl. net ≤ 0)', Object.keys(mats).length.toLocaleString()],
-  ];
-  $('#kpis').innerHTML = kp.map(([l,n])=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
-}
-
-function renderCanonical(d){
-  const box = $('#canonBox'); if(!box) return; const c = d.counts||{};
-  box.innerHTML = `<div style="margin-top:14px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--violet);border-radius:8px;padding:12px 16px">
-    <div style="font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--violet);margin-bottom:6px">Canonical dataset · schema v${d.schemaVersion} · phase ${d.meta.phase}</div>
-    <div class="note" style="margin:0">${c.materials} materials · ${c.families} families · ${c.dispositions} dispositions · ${c.verifications} verifications${c.needsIdentification?` · ${c.needsIdentification} need identification`:''}. This one JSON is the shared contract — <b>Export JSON</b> to hand to the app / desktop viewer.</div>
-  </div>`;
-}
-
-function renderScoreboard(sb){
-  const box = $('#scoreBox'); if(!box) return; const k = sb.kpi;
-  box.innerHTML = `<div style="margin-top:14px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;padding:14px 16px">
-    <div style="font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);margin-bottom:10px">Removal scoreboard — duplicate disposition</div>
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi" style="border-left-color:var(--ok)"><div class="n">${k.pctEliminated}%</div><div class="l">Eliminated</div></div>
-      <div class="kpi" style="border-left-color:var(--crit)"><div class="n">${k.reorderRisk}</div><div class="l">reorder-on-retire</div></div>
-      <div class="kpi" style="border-left-color:var(--ok)"><div class="n">${k.runningDown}</div><div class="l">running-down</div></div>
-      <div class="kpi"><div class="n">${k.retireSkus}</div><div class="l">retire SKUs · ${k.families} fam</div></div>
-    </div>
-    <div class="note" style="margin-top:8px">${k.onHandInRetire} units on-hand tied in retired numbers${k.provisionalFamilies?` · ${k.provisionalFamilies} family(ies) “no technical preference”`:''}. Needs INV MSTR loaded for on-hand accuracy.</div>
-  </div>`;
-}
-
-function renderVerification(v){
-  const box = $('#verifBox'); if(!box) return;
-  box.innerHTML = `<div class="kpi valid pass" style="margin-top:12px;border-left-color:var(--core)">
-    <div class="n">${v.families} <span class="muted" style="font-size:13px">families field-verified</span></div>
-    <div class="l">Captures merged — ${v.verdicts.SAME} same · ${v.verdicts.SPLIT} split · ${v.verdicts.ALL_DIFFERENT} all-different · ${v.provisional} “no tech preference” · ${v.captures} record(s) from ${v.bundles} bundle(s)</div>
-  </div>`;
-}
-
+let KPI_IW=0, KPI_SEEN=0;
 async function validate(mats){
-  const gold = csvToObjects(await readText(files.gold));
-  let total=0, match=0, mism=0, missing=0; const ex=[];
-  gold.forEach(g=>{
-    const mn = String(g['Material']||'').trim(); if(!mn) return;
-    total++;
-    const want = parseFloat(g['Net consumed']||'0')||0;
+  const gold=csvToObjects(await readText(files.gold));
+  let total=0,match=0,mism=0,missing=0; const ex=[];
+  gold.forEach(g=>{ const mn=String(g['Material']||'').trim(); if(!mn)return; total++;
+    const want=parseFloat(g['Net consumed']||'0')||0;
     if(!(mn in mats)){ missing++; return; }
-    const got = CalibreEngine.round1(mats[mn].netAll);
-    if(Math.abs(got-want)<0.5) match++;
-    else { mism++; if(ex.length<8) ex.push(`${mn}: golden ${want} vs engine ${got}`); }
-  });
-  const pass = (mism===0 && missing===0);
-  $('#validBox').innerHTML =
-    `<div class="kpi valid ${pass?'pass':'fail'}" style="margin-top:12px">
-       <div class="n">${match}/${total} <span class="muted" style="font-size:13px">match</span></div>
-       <div class="l">Self-check vs golden consumption_by_unit.csv — ${pass?'✓ exact':(mism+' mismatch · '+missing+' missing')}</div>
-       ${ex.length?`<details style="margin-top:8px"><summary>show mismatches</summary><div class="mono note">${ex.join('<br>')}</div></details>`:''}
-     </div>`;
+    const got=CalibreEngine.round1(mats[mn].netAll);
+    if(Math.abs(got-want)<0.5) match++; else { mism++; if(ex.length<8) ex.push(`${mn}: golden ${want} vs engine ${got}`); } });
+  return { total,match,mism,missing,ex,pass:(mism===0&&missing===0) };
 }
 
-function renderTable(){
-  const q = $('#search').value.trim().toLowerCase();
-  let rows = tableRows;
-  if(q) rows = rows.filter(r=> r.mn.toLowerCase().includes(q) || (r.byUnit||'').toLowerCase().includes(q));
-  rows = rows.slice().sort((a,b)=>{
-    let x=a[sortK], y=b[sortK];
-    if(typeof x==='string'){ x=x.toLowerCase(); y=(y||'').toLowerCase(); return sortDir*(x<y?-1:x>y?1:0); }
-    return sortDir*((x||0)-(y||0));
-  });
-  const cap = 500;
-  const body = rows.slice(0,cap).map(r=>`<tr>
-    <td class="mn">${r.mn}</td><td>${esc(r.desc)}</td>
-    <td class="num">${r.net}</td><td class="num">${r.onHand}</td><td class="mono">${esc(r.mrp)}</td>
-    <td class="num">${r.units}</td><td>${esc(r.dup)}</td></tr>`).join('');
-  $('#tbl tbody').innerHTML = body;
-  $('#tblnote').textContent = rows.length>cap ? `Showing top ${cap} of ${rows.length} (refine with the filter).` : `${rows.length} materials.`;
-}
-function esc(s){ return (window.NumaCoreLib&&NumaCoreLib.esc)?NumaCoreLib.esc(s):String(s==null?'':s); }
-
-$('#search').addEventListener('input', renderTable);
-document.querySelectorAll('#tbl th').forEach(th=>th.addEventListener('click',()=>{
-  const k=th.dataset.k; if(sortK===k) sortDir=-sortDir; else {sortK=k; sortDir = (k==='mn'||k==='desc'||k==='top')?1:-1;}
+/* ═══ STEP 2 · CONSUMPTION ═══ */
+function consumptionScreen(){
+  if(!DERIVED){ toast('Load & derive first'); return deriveHome(); }
+  crumb('Consumption'); here('consumption',consumptionScreen);
+  const total=TABLEROWS.reduce((s,r)=>s+r.net,0);
+  M.innerHTML = `
+  <h2 style="color:var(--equip-t)">Consumption by material</h2>
+  <div class="kpis" style="margin-bottom:14px">
+    <div class="kpi ok"><div class="n">${TABLEROWS.length.toLocaleString()}</div><div class="l">materials · net &gt; 0</div></div>
+    <div class="kpi"><div class="n">${CalibreEngine.round1(total).toLocaleString()}</div><div class="l">total net consumed</div></div>
+    <div class="kpi"><div class="n">${KPI_IW.toLocaleString()}</div><div class="l">orders indexed (IW39)</div></div>
+    <div class="kpi"><div class="n">${KPI_SEEN.toLocaleString()}</div><div class="l">materials seen</div></div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+    <input class="search" id="tsearch" placeholder="filter material / desc…" value="${esc(tq)}">
+    <span class="note" id="tblnote" style="margin:0"></span>
+  </div>
+  <div class="tblwrap"><table id="tbl"><thead><tr>
+    <th data-k="mn">Material</th><th data-k="desc">Description</th><th data-k="net" class="num">Net consumed</th>
+    <th data-k="onHand" class="num">On hand</th><th data-k="mrp">MRP</th><th data-k="units" class="num">Units</th><th data-k="dup">Dup group</th>
+  </tr></thead><tbody></tbody></table></div>
+  <button class="ghost" style="margin-top:14px" onclick="goHome()">← home</button>`;
+  $('#tsearch').addEventListener('input',e=>{ tq=e.target.value; renderTable(); });
+  document.querySelectorAll('#tbl th').forEach(th=>th.addEventListener('click',()=>{ const k=th.dataset.k; if(sortK===k)sortDir=-sortDir; else{sortK=k;sortDir=(k==='mn'||k==='desc')?1:-1;} renderTable(); }));
   renderTable();
-}));
+}
+function renderTable(){
+  const q=(tq||'').trim().toLowerCase();
+  let rows=TABLEROWS;
+  if(q) rows=rows.filter(r=>r.mn.toLowerCase().includes(q)||(r.byUnit||'').toLowerCase().includes(q)||(r.desc||'').toLowerCase().includes(q));
+  rows=rows.slice().sort((a,b)=>{ let x=a[sortK],y=b[sortK]; if(typeof x==='string'){x=x.toLowerCase();y=(y||'').toLowerCase();return sortDir*(x<y?-1:x>y?1:0);} return sortDir*((x||0)-(y||0)); });
+  const cap=500;
+  $('#tbl tbody').innerHTML = rows.slice(0,cap).map(r=>`<tr><td class="mn">${esc(r.mn)}</td><td>${esc(r.desc)}</td><td class="num">${r.net}</td><td class="num">${r.onHand}</td><td class="mono">${esc(r.mrp)}</td><td class="num">${r.units}</td><td>${esc(r.dup)}</td></tr>`).join('');
+  $('#tblnote').textContent = rows.length>cap?`Showing top ${cap} of ${rows.length}.`:`${rows.length} materials.`;
+}
 
-$('#export').addEventListener('click', ()=>{
-  if(!derived) return;
-  const blob = new Blob([JSON.stringify(derived,null,2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob); const a=document.createElement('a');
-  const stamp = new Date().toISOString().slice(0,10);
-  a.href=url; a.download='calibre_map_dataset_'+stamp+'.json'; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url), 2000);
-});
+/* ═══ STEP 3 · DUPLICATES & SCOREBOARD ═══ */
+function scoreboardScreen(){
+  if(!DERIVED){ toast('Load & derive first'); return deriveHome(); }
+  crumb('Duplicates & Scoreboard'); here('scoreboard',scoreboardScreen);
+  let html=`<h2 style="color:var(--verify-t)">Duplicates &amp; scoreboard</h2>`;
+  if(SB){ const k=SB.kpi; const tot=k.retireSkus||0; const seg=(n,col)=>{ const pct=tot?Math.round(100*n/tot):0; return pct?`<span style="width:${pct}%;background:${col}">${pct>7?n:''}</span>`:''; };
+    html+=`<div class="card"><div class="fh" style="color:var(--verify-t)">Removal scoreboard — duplicate disposition</div>
+      <div class="kpis">
+        <div class="kpi ok"><div class="n">${k.pctEliminated}%</div><div class="l">eliminated</div></div>
+        <div class="kpi crit"><div class="n">${k.reorderRisk}</div><div class="l">reorder-on-retire</div></div>
+        <div class="kpi ok"><div class="n">${k.runningDown}</div><div class="l">running-down</div></div>
+        <div class="kpi"><div class="n">${k.retireSkus}</div><div class="l">retire SKUs · ${k.families} fam</div></div>
+      </div>
+      <div class="bar">${seg(SB.eliminated!=null?SB.eliminated:0,'var(--text-d)')}${seg(k.runningDown,'var(--ok)')}${seg(k.reorderRisk,'var(--crit)')}</div>
+      <div class="note">${(k.onHandInRetire||0).toLocaleString()} units on-hand tied in retired numbers${k.provisionalFamilies?` · ${k.provisionalFamilies} family(ies) “no technical preference”`:''}. Needs INV MSTR for on-hand accuracy.</div></div>`;
+  } else html+=`<div class="card"><div class="fh">Removal scoreboard</div><div class="note">No disposition yet — load field captures (materialid_bundle_*.json) in Step 1 to populate verdicts and the scoreboard.</div></div>`;
+  if(VERIF){ html+=`<div class="card"><div class="fh" style="color:var(--verify-t)">Verification merge</div>
+    <div class="kpis"><div class="kpi ok"><div class="n">${VERIF.families}</div><div class="l">families field-verified</div></div>
+      <div class="kpi"><div class="n">${VERIF.verdicts.SAME}</div><div class="l">SAME</div></div>
+      <div class="kpi"><div class="n">${VERIF.verdicts.SPLIT}</div><div class="l">SPLIT</div></div>
+      <div class="kpi"><div class="n">${VERIF.verdicts.ALL_DIFFERENT}</div><div class="l">all-different</div></div></div>
+    <div class="note">${VERIF.provisional} “no tech preference” · ${VERIF.captures} record(s) from ${VERIF.bundles} bundle(s).</div></div>`; }
+  if(VALID){ html+=`<div class="card"><div class="fh" style="color:${VALID.pass?'var(--ok)':'var(--crit)'}">Self-check vs golden</div>
+    <div class="kpi ${VALID.pass?'ok':'crit'}"><div class="n">${VALID.match}/${VALID.total}</div><div class="l">${VALID.pass?'✓ exact match':(VALID.mism+' mismatch · '+VALID.missing+' missing')}</div></div>
+    ${VALID.ex.length?`<details><summary>show mismatches</summary><div class="note mono">${VALID.ex.map(esc).join('<br>')}</div></details>`:''}</div>`; }
+  html+=`<button class="ghost" style="margin-top:6px" onclick="goHome()">← home</button>`;
+  M.innerHTML=html;
+}
+
+/* ═══ STEP 4 · DATASET & EXPORT ═══ */
+function datasetScreen(){
+  if(!DERIVED){ toast('Load & derive first'); return deriveHome(); }
+  crumb('Dataset & Export'); here('dataset',datasetScreen);
+  const d=DERIVED, c=d.counts||{}, m=d.meta||{};
+  M.innerHTML = `
+  <h2 style="color:var(--core)">Canonical dataset</h2>
+  <div class="card"><div class="fh" style="color:var(--core)">The shared contract · schema v${esc(d.schemaVersion)} · phase ${esc(m.phase)}</div>
+    <div class="kv">
+      <div class="k">Counts</div><div class="v">${c.materials} materials · ${c.families} families · ${c.dispositions} dispositions · ${c.verifications} verifications${c.needsIdentification?` · ${c.needsIdentification} need ID`:''}</div>
+      <div class="k">Generated</div><div class="v mono">${esc(m.generatedAt||'—')}</div>
+      <div class="k">Sources</div><div class="v mono" style="font-size:11.5px">${Object.values(m.sourceFiles||{}).filter(Boolean).map(esc).join('<br>')||'—'}</div>
+    </div>
+    <div class="note" style="margin-top:10px">This one JSON is what the Viewer and the field app consume. Export it and move it by USB.</div>
+  </div>
+  <div class="btnrow">
+    <button class="primary core" id="export">⤓ Export JSON</button>
+    <a class="ghost" href="viewer.html" style="display:flex;align-items:center;justify-content:center;text-decoration:none">Open in Viewer →</a>
+  </div>
+  <button class="ghost" style="margin-top:14px" onclick="goHome()">← home</button>`;
+  $('#export').addEventListener('click',()=>{
+    const blob=new Blob([JSON.stringify(DERIVED,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download='calibre_map_dataset_'+(new Date().toISOString().slice(0,10))+'.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000); toast('Exported canonical JSON');
+  });
+}
+
+/* ═══ QUERY INBOX · edit allocation (single-source correction) ═══ */
+const CATS=['Brakes','Air system','Charging & starting','Lighting & electrical','Wheel end','Driveline','Suspension & steering','Winter package','Coupling & trailer','Engine & emissions','Cab & body'];
+let IQ='';
+function queryInbox(){
+  if(!DERIVED){ toast('Load & derive first'); return deriveHome(); }
+  crumb('Query Inbox'); here('inbox',queryInbox);
+  DERIVED.corrections = DERIVED.corrections || [];
+  const flags=(DERIVED.verification||[]).filter(v=>v.type==='allocation_flag');
+  const log=DERIVED.corrections;
+  M.innerHTML = `
+  <h2 style="color:var(--verify-t)">Query Inbox</h2>
+  <div class="card"><div class="fh" style="color:var(--verify-t)">Flags from the field</div>
+    ${flags.length? '<div class="list">'+flags.map(f=>`<div class="qrow"><div><div class="qid">${esc(f.material||f.family_id||'')}</div><div class="qd">${esc(f.finding||f.site_answer||'allocation flag')}${f.tech?' · by '+esc(f.tech):''}</div></div></div>`).join('')+'</div>'
+      : '<div class="note">No allocation flags in the loaded captures yet. Techs raise these in the field App (flag → not edit); they arrive here with the capture bundles. The App-side flag control is on the roadmap — the correction path below already works today.</div>'}
+  </div>
+  <div class="card"><div class="fh" style="color:var(--verify-t)">Auto-queued for category review — <span id="qct"></span></div>
+    <div class="note" style="margin:0 0 10px">Parts the categoriser placed with <b>low confidence</b> — worth a quick web-check to upgrade — impact-sorted (highest net consumption first). Set the right system and Save; written <b>once</b> to the canonical dataset, drops off the queue. Showing top 50. <b>Unclassified</b> parts (no keyword) are deliberately NOT queued — they sit in their own bucket in the Viewer's Parts Mapping.</div>
+    <div id="autoq"></div>
+  </div>
+  <div class="card"><div class="fh" style="color:var(--verify-t)">Correct an allocation (search)</div>
+    <div class="note" style="margin:0 0 12px">Or find any part directly, set its correct system, and save. Same single-source correction — flows to the App and Viewer on the next export.</div>
+    <input class="search" id="iq" style="width:100%;margin-bottom:12px" placeholder="search SAP # · PN · description…" value="${esc(IQ)}">
+    <div id="iresults"></div>
+  </div>
+  ${log.length?`<div class="card"><div class="fh" style="color:var(--equip-t)">Corrections this session — ${log.length}</div>
+    ${log.slice().reverse().map(c=>`<div class="clog">${esc(c.material)} · ${esc(c.field)}: ${esc(c.from||'—')} → <b>${esc(c.to)}</b></div>`).join('')}</div>`:''}
+  <button class="ghost" style="margin-top:6px" onclick="goHome()">← home</button>`;
+  const iq=$('#iq'); iq.addEventListener('input',e=>{ IQ=e.target.value; renderInbox(); });
+  renderQueue(); renderInbox();
+}
+function renderQueue(){
+  const el=$('#autoq'); if(!el) return;
+  const rows=(DERIVED.materials||[]).filter(m=>m.category_confidence==='low')
+    .sort((a,b)=>(Number(b.net_consumed)||0)-(Number(a.net_consumed)||0));
+  const ct=$('#qct'); if(ct) ct.textContent=rows.length;
+  el.innerHTML = rows.length ? rows.slice(0,50).map(m=>{
+    const cur=m.category||'';
+    const opts=['<option value="">— unassigned —</option>'].concat(CATS.map(c=>`<option value="${esc(c)}"${c===cur?' selected':''}>${esc(c)}</option>`)).join('');
+    const cf=m.category_confidence, col=cf==='none'?'var(--text-d)':'var(--warn)';
+    return `<div class="qrow">
+      <div><div class="qid">${esc(m.material)}${m.pn?' · '+esc(m.pn):''} <span style="color:${col};font-family:var(--f-mono);font-size:10px">${esc(cf)}</span></div>
+      <div class="qd">${esc(m.description||'')} · <span style="color:var(--text-d)">now: ${esc(cur||'unassigned')}${m.category_reason?' — '+esc(m.category_reason):''}</span></div></div>
+      <select class="sel" data-mn="${esc(m.material)}">${opts}</select>
+      <button class="qsave" data-mn="${esc(m.material)}">Save</button></div>`;
+  }).join('') : '<div class="note">Queue empty — every categorised part is high-confidence.</div>';
+  el.querySelectorAll('.qsave').forEach(b=>b.addEventListener('click',()=>saveCorrection(b.dataset.mn)));
+}
+function renderInbox(){
+  const R=$('#iresults'); if(!R) return;
+  const q=(IQ||'').trim().toLowerCase();
+  if(q.length<2){ R.innerHTML='<div class="note">Type at least 2 characters.</div>'; return; }
+  const hits=(DERIVED.materials||[]).filter(m=>
+    String(m.material).toLowerCase().includes(q) || String(m.pn||'').toLowerCase().includes(q) || String(m.description||'').toLowerCase().includes(q)
+  ).slice(0,40);
+  R.innerHTML = hits.length ? hits.map(m=>{
+    const cur=m.category||'';
+    const opts=['<option value="">— unassigned —</option>'].concat(CATS.map(c=>`<option value="${esc(c)}"${c===cur?' selected':''}>${esc(c)}</option>`)).join('');
+    return `<div class="qrow">
+      <div><div class="qid">${esc(m.material)}${m.pn?' · '+esc(m.pn):''}</div><div class="qd">${esc(m.description||'')} · <span style="color:var(--text-d)">now: ${esc(cur||'unassigned')}</span></div></div>
+      <select class="sel" data-mn="${esc(m.material)}">${opts}</select>
+      <button class="qsave" data-mn="${esc(m.material)}">Save</button></div>`;
+  }).join('') : '<div class="note">No match.</div>';
+  R.querySelectorAll('.qsave').forEach(b=>b.addEventListener('click',()=>saveCorrection(b.dataset.mn)));
+}
+function saveCorrection(mn){
+  const sel=document.querySelector('.sel[data-mn="'+CSS.escape(mn)+'"]'); if(!sel) return;
+  const to=sel.value; const m=(DERIVED.materials||[]).find(x=>String(x.material)===String(mn)); if(!m) return;
+  const from=m.category||'';
+  m.category=to||undefined;
+  m.category_confidence='high'; m.category_reason='analyst-confirmed';   // confirmed → drops off the auto-queue
+  DERIVED.corrections=DERIVED.corrections||[];
+  if(from!==to) DERIVED.corrections.push({ material:String(mn), field:'category', from:from, to:to, ts:new Date().toISOString(), by:'analyst' });
+  toast(from!==to ? ('Corrected '+mn+' → '+(to||'unassigned')) : ('Confirmed '+mn));
+  queryInbox();
+}
+
+goHome();
 </script>
 </body>
 </html>
