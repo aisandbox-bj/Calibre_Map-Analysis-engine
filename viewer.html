@@ -453,8 +453,8 @@ function partRow(m){
   const mn=String(m.material);
   return `<div class="row" onclick="partView('${mn}')">
     <div style="flex:1;min-width:0">
-      <div class="t"><span class="sap">SAP#</span> ${esc(mn)}${m.pn?` <b>· ${esc(m.pn)}</b>`:''}</div>
-      <div class="s">${esc(m.description||'')}${m.traced_brand?' · '+esc(m.traced_brand):''}</div>
+      <div class="t">${esc(m.description||m.pn||mn)}${m.traced_brand?` <span style="color:var(--text-d);font-weight:400">· ${esc(m.traced_brand)}</span>`:''}</div>
+      <div class="s"><span class="sap">SAP#</span> ${esc(mn)}${m.pn?` <b style="color:var(--map)">· ${esc(m.pn)}</b>`:''}</div>
       <div class="badges">
         ${m.on_hand!=null&&+m.on_hand>0?`<span class="badge b-oh">On hand · ${esc(m.on_hand)}</span>`:''}
         ${m.net_consumed?`<span class="badge b-net">Net ${esc(nf(m.net_consumed))}</span>`:''}
@@ -469,9 +469,9 @@ function partView(mn){
   const wu=(m.where_used||[]);
   M.innerHTML = `
   <div class="hero">
-    <div class="eyebrow-mono">SAP# ${esc(mn)}</div>
-    <div class="pn">${esc(m.pn||m.description||mn)}</div>
-    <div class="dl">${esc(m.traced_brand?m.traced_brand+' · ':'')}${esc(m.description||'')}</div>
+    <div class="eyebrow-mono">SAP# ${esc(mn)}${m.pn?' · '+esc(m.pn):''}</div>
+    <div class="pn">${esc(m.description||m.pn||mn)}</div>
+    ${m.traced_brand?`<div class="dl" style="color:var(--map);font-weight:600">${esc(m.traced_brand)}</div>`:''}
     <div class="dl">On hand — ${esc(m.on_hand==null?'—':nf(m.on_hand))}${m.net_consumed?' · Net consumed — '+esc(nf(m.net_consumed)):''}${wu.length?' · '+wu.length+' unit'+(wu.length>1?'s':''):''}</div>
   </div>
   <div class="factgrid">
@@ -493,7 +493,7 @@ function partView(mn){
   <h3 style="color:var(--map)">Potential duplicates</h3>
   ${dupPanel(m)}
   <h3 style="color:var(--map)">Where used${wu.length?` — ${wu.length} unit${wu.length>1?'s':''}`:''}</h3>
-  <div class="wu">${ wu.length ? wu.slice(0,50).map(u=>`<div class="u"><div class="uh"><span>${esc(u.unit)}</span><b>${esc(nf(u.qty))}</b></div>${(u.wos||[]).slice(0,6).map(w=>`<div class="wos">${esc(w[0])} · ${esc(nf(w[1]))} · ${esc(w[2])} · ${esc(w[3]||'')}</div>`).join('')}</div>`).join('') : '<div class="note">No work-order issues recorded for this part in the dataset.</div>' }</div>
+  <div class="wu">${ wu.length ? wu.slice(0,50).map(u=>{ const wid='vw_'+esc(mn)+'_'+String(u.unit).replace(/[^A-Za-z0-9]/g,''); const wos=(u.wos||[]); return `<div class="u"><div class="uh" style="cursor:pointer" onclick="var e=document.getElementById('${wid}');e.style.display=e.style.display==='block'?'none':'block'"><span>${esc(u.unit)}${wos.length?' · '+wos.length+' WO'+(wos.length>1?'s':''):''}</span><b>${esc(nf(u.qty))}</b></div><div id="${wid}" style="display:none;padding:2px 0 6px">${wos.slice(0,12).map(w=>`<div class="wos"><div style="color:var(--text);font-weight:600">${esc(w[3]||('WO '+w[0]))}</div><div style="font-size:12px"><span style="color:var(--text-d)">WO ${esc(w[0])}${w[2]?' · '+esc(w[2]):''}</span> <span style="color:var(--map);font-weight:600">· qty ${esc(nf(w[1]))}</span></div></div>`).join('')||'<div class="wos" style="color:var(--text-d)">no work-order detail</div>'}</div></div>`; }).join('') : '<div class="note">No work-order issues recorded for this part in the dataset.</div>' }</div>
   <button class="ghost" onclick="goBack()">← back</button>`;
   document.querySelectorAll('#main .dupmemb[data-mn]').forEach(el=>el.addEventListener('click',()=>partView(el.dataset.mn)));
 }
@@ -542,12 +542,21 @@ function partsInCats(cats, kw){
   const re = kw ? new RegExp(kw,'i') : null;
   return (DATA.materials||[]).filter(m=> m.category && cats.indexOf(m.category)>=0 && (!re || re.test((m.description||'')+' '+(m.fits||''))));
 }
+/* Unit-scoped relevance — a part counts for a unit only if it was consumed on it
+   (where_used) or on a same make/model unit ("similar units"), so the unit-drill
+   counts are real, not whole-category totals. */
+function vFleetGroup(uid){ const u=FLEETBYUNIT[uid]; if(!u) return '?'+uid;
+  return (/trail/i.test(u.type||'')) ? ('Trailers — '+(u.make||'')) : ((u.make||'')+' '+String(u.model||'').replace(/[0-9].*$/,m=>m.slice(0,4))); }
+function vRelevant(m, uid){ const wu=m.where_used||[]; if(!wu.length) return false;
+  if(wu.some(w=>w&&w.unit===uid)) return true; const g=vFleetGroup(uid); return wu.some(w=>w&&vFleetGroup(w.unit)===g); }
+function partsForUnit(uid, cats, kw){ const re=kw?new RegExp(kw,'i'):null;
+  return (DATA.materials||[]).filter(m=> m.category && cats.indexOf(m.category)>=0 && (!re || re.test((m.description||'')+' '+(m.fits||''))) && vRelevant(m, uid)); }
 function unitView(uid){
   const u=FLEETBYUNIT[uid]||{unit:uid};
   const consumed=(UNITINDEX[uid]||[]);
   crumb('Unit · '+uid); here('unit:'+uid, ()=>unitView(uid));
   const zones=zonesFor(u);
-  const zoneTiles=zones.map(z=>{ const n=partsInCats(z.cats).length;
+  const zoneTiles=zones.map(z=>{ const n=partsForUnit(uid, z.cats).length;
     return `<div class="tile ${n?'':'zero'}" onclick="zoneView('${esc(uid)}','${z.id}')">
       <span class="tic">${IC.layers}</span>
       <div style="flex:1"><div class="tn">${esc(z.label)}</div><div class="tc">${n} part${n===1?'':'s'}</div></div>
@@ -556,7 +565,7 @@ function unitView(uid){
   const nc=new Set(consumed.map(c=>c.mn)).size;
   M.innerHTML = `
   <div class="hero"><div class="eyebrow-mono">${esc([u.type,u.year,u.engine].filter(Boolean).join(' · ')||'unit')}</div>
-    <div class="pn">${esc(uid)}</div><div class="dl">${esc([u.make,u.model].filter(Boolean).join(' ')||'not in fleet register')}</div></div>
+    <div class="pn">${esc(uid)} <span style="color:var(--map);font-weight:600;font-size:.62em">— ${esc([u.make,u.model].filter(Boolean).join(' ')||'not in fleet register')}</span></div></div>
   <h3 style="color:var(--map)">Pick a system</h3>
   <div class="tiles">${zoneTiles}</div>
   ${nc?`<div class="tile consumed" onclick="unitConsumed('${esc(uid)}')" style="margin-bottom:14px">
@@ -570,7 +579,7 @@ function zoneView(uid, zid){
   const z=zonesFor(u).find(x=>x.id===zid); const ss=SUBSYS[zid];
   if(!ss) return compView(uid, zid, -1);
   crumb(uid+' · '+z.label); here('zone:'+uid+':'+zid, ()=>zoneView(uid,zid));
-  const tiles=ss.map((c,i)=>{ const n=partsInCats(c.cats, c.kw).length;
+  const tiles=ss.map((c,i)=>{ const n=partsForUnit(uid, c.cats, c.kw).length;
     return `<div class="tile ${n?'':'zero'}" onclick="compView('${esc(uid)}','${zid}',${i})">
       <span class="tic">${IC.box}</span>
       <div style="flex:1"><div class="tn">${esc(c.l)}</div><div class="tc">${n} part${n===1?'':'s'}</div></div>
@@ -587,7 +596,7 @@ function compView(uid, zid, ci){
   const comp = (ci>=0 && ss) ? ss[ci] : null;
   const cats = comp ? comp.cats : (z?z.cats:[]);
   const mk = String(u.make||'').toUpperCase().slice(0,6);
-  let parts = partsInCats(cats, comp?comp.kw:null);
+  let parts = partsForUnit(uid, cats, comp?comp.kw:null);
   parts.sort((a,b)=>{ const am=((a.fits||'')+(a.description||'')).toUpperCase().includes(mk)&&mk?0:1;
     const bm=((b.fits||'')+(b.description||'')).toUpperCase().includes(mk)&&mk?0:1;
     return am-bm || (Number(b.on_hand)||0)-(Number(a.on_hand)||0); });
@@ -610,8 +619,8 @@ function unitConsumed(uid){
     <div class="dl">${rows.length} distinct part${rows.length===1?'':'s'} consumed</div></div>
   <div class="list">${rows.map(r=>`<div class="row" onclick="partView('${esc(String(r.m.material))}')">
     <div style="flex:1;min-width:0">
-      <div class="t"><span class="sap">SAP#</span> ${esc(r.m.material)}${r.m.pn?` <b>· ${esc(r.m.pn)}</b>`:''}</div>
-      <div class="s">${esc(r.m.description||'')}${r.m.traced_brand?' · '+esc(r.m.traced_brand):''}</div>
+      <div class="t">${esc(r.m.description||r.m.pn||r.m.material)}${r.m.traced_brand?` <span style="color:var(--text-d);font-weight:400">· ${esc(r.m.traced_brand)}</span>`:''}</div>
+      <div class="s"><span class="sap">SAP#</span> ${esc(r.m.material)}${r.m.pn?` <b style="color:var(--map)">· ${esc(r.m.pn)}</b>`:''}</div>
       <div class="badges"><span class="badge b-net">Qty ${esc(nf(Math.round(r.qty)))}</span>${dupBadge(r.m)}</div>
     </div><span class="chev">${IC.chev}</span></div>`).join('')}</div>
   <button class="ghost" onclick="goBack()">← back</button>`;

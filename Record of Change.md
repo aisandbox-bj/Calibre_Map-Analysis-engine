@@ -4,6 +4,30 @@ Reverse-chronological. Each entry: what changed, why, and how to roll back. `eng
 
 ---
 
+## 2026-08-31 · UI review pass — `viewer.html` (mirrors the field app)
+
+**Why.** Operator UI review (deck `App/2026_08_31 UI review/`) — a consistent hierarchy across
+both surfaces (human-readable **description primary/white on top**; identifiers SAP/VPN/WO#/qty
+secondary grey+blue below) plus a real correctness fix to the unit-drill part counts.
+
+**Changed (`viewer.html`; the field app `app_template.html` is the design owner, changed in lockstep):**
+- **Unit-scoped counts** — new `partsForUnit(uid,cats,kw)` (+ `vRelevant`/`vFleetGroup`): a part counts
+  for a unit only if it was consumed on it (`where_used`) or on a same make/model unit ("similar units").
+  `unitView`/`zoneView`/`compView` use it — counts drop from whole-category totals to real per-unit numbers
+  (e.g. Engine bay 461→184), and the parts list matches the count.
+- **Make/model inline** with the unit number in the unit hero.
+- **Part rows** lead with the description (white); SAP# (grey) · VPN (blue) below. Same for the
+  consumed-parts list.
+- **Part-detail hero** = description + brand (blue); SAP/VPN stay in the Identity box.
+- **Where-used** — each unit row expands its WOs inline (accordion, hidden by default); WO cards lead
+  with the **WO description** (white), WO no · date (grey) · qty (blue) below.
+
+**Verify.** Loaded the real canonical in the viewer: 1428 materials, no JS errors, counts scoped
+(Engine bay 461→184), make/model inline, detail hero = description, where-used accordion hidden-by-default.
+`engine.js` untouched — golden unaffected. Shipped in the field app as **V4.3.6**.
+
+---
+
 ## 2026-08-30 · Assessment overlay — upgrades persist across re-derives & flow to the app — `engine.js` **0.7.1**
 
 **Why (operator: "will the upgrades pull through to the viewer AND the app — now and on re-audit?").**
