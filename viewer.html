@@ -218,7 +218,7 @@ const CAT_ORDER=['Brakes','Air system','Charging & starting','Lighting & electri
 /* ── system-zone taxonomy — ported verbatim from the field app so the drill
    flows identically. Zones per unit type; sub-systems filter by category + keyword. ── */
 const TRACTOR_ZONES=[
-  {id:'cab',label:'Cab',cats:['Lighting & electrical','Winter package']},
+  {id:'cab',label:'Cab & body',cats:['Lighting & electrical','Winter package','Cab & body']},
   {id:'engine',label:'Engine bay',cats:['Engine & emissions','Charging & starting','Air system']},
   {id:'steer',label:'Steer axle',cats:['Suspension & steering','Wheel end']},
   {id:'frame',label:'Frame & driveline',cats:['Driveline','Coupling & trailer']},
@@ -226,7 +226,7 @@ const TRACTOR_ZONES=[
 ];
 const TRAILER_ZONES=[
   {id:'coupling',label:'Kingpin · landing gear',cats:['Coupling & trailer']},
-  {id:'deck',label:'Deck · lights · electrical',cats:['Lighting & electrical','Coupling & trailer']},
+  {id:'deck',label:'Deck · body · electrical',cats:['Lighting & electrical','Coupling & trailer','Cab & body']},
   {id:'bogey',label:'Axles · brakes · suspension',cats:['Brakes','Suspension & steering','Wheel end','Air system']}
 ];
 const SUBSYS={
@@ -253,7 +253,8 @@ const SUBSYS={
     {l:'Mirrors',cats:['Lighting & electrical'],kw:'MIRROR'},
     {l:'Cab HVAC (cores, blowers, controls)',cats:['Winter package','Lighting & electrical'],kw:'HEATER|HVAC|CORE|BLOWER|VALVE, BODY|ACTUATOR|CONTROL'},
     {l:'Winter heat (fired, block, battery)',cats:['Winter package'],kw:'WEBASTO|ESPAR|AIRTRONIC|BLOCK|ZEROSTART|IMMERSION|PAD|CIRCULAT|GLOW|CORD'},
-    {l:'Switches, fuses & harnesses',cats:['Lighting & electrical','Charging & starting'],kw:'SWITCH|FUSE|RELAY|HARNESS|SOCKET|PLUG|TERMINAL'}],
+    {l:'Switches, fuses & harnesses',cats:['Lighting & electrical','Charging & starting'],kw:'SWITCH|FUSE|RELAY|HARNESS|SOCKET|PLUG|TERMINAL'},
+    {l:'Body, glass & hardware',cats:['Cab & body'],kw:'.'}],
   frame:[{l:'5th wheel & coupling',cats:['Coupling & trailer'],kw:'FIFTH|5TH|KINGPIN|KING PIN|GLADHAND|CAMLOCK|SOCKET|PLUG'},
     {l:'Driveshafts & PTO',cats:['Driveline'],kw:'YOKE|U-JOINT|SHAFT|PTO|SPL|SLIP'},
     {l:'Air tanks & valves',cats:['Air system','Brakes'],kw:'TANK|VALVE|GOVERNOR|CHECK'},
@@ -267,7 +268,8 @@ const SUBSYS={
     {l:'Foundation brakes',cats:['Brakes'],kw:'SHOE|DRUM|CHAMBER|SLACK|CAM|LINING'}],
   deck:[{l:'Marker & tail lamps',cats:['Lighting & electrical'],kw:'LAMP|LIGHT|LED|MARKER|GROMMET|PIGTAIL'},
     {l:'Harnesses, sockets & cables',cats:['Lighting & electrical','Coupling & trailer'],kw:'HARNESS|SOCKET|CABLE|PLUG|WIRE'},
-    {l:'Deck hardware & mudflaps',cats:['Coupling & trailer','Lighting & electrical'],kw:'MUDFLAP|BRACKET|BOX|LATCH|WHIP'}]
+    {l:'Deck hardware & mudflaps',cats:['Coupling & trailer','Lighting & electrical'],kw:'MUDFLAP|BRACKET|BOX|LATCH|WHIP'},
+    {l:'Body, glass & hardware',cats:['Cab & body'],kw:'.'}]
 };
 function zonesFor(u){ return (u && /trail/i.test(u.type||'')) ? TRAILER_ZONES : TRACTOR_ZONES; }
 

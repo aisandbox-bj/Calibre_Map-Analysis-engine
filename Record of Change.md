@@ -30,9 +30,12 @@ the "correct once, propagate everywhere" gap so the merge is a real pipeline sta
 proving persistence. `build_app.py` compiles; overlay maps all 1428 canonical categories (Cab & body 71).
 Canonical re-filed to `Analysis/calibre_map_dataset_P1120.json` (viewer reads it directly).
 
-**Open.** Field-app runtime still needs a "Cab & body" zone in `app_template.html` + an APK rebuild
-(then `build_app.py`'s new overlay takes effect in the shipped app). Harness `/api/export` is the
-production source for `dataset.assessment` (this run used a file generated from the validated consensus).
+**Field-app propagation DONE (2026-08-31, app V4.3.5).** "Cab & body" added to the tractor Cab zone +
+trailer Deck zone (each with a "Body, glass & hardware" sub-system) in `app_template.html` (owner) +
+`viewer.html` (mirror); `build_app.py` overlays category from the canonical (653 parts recategorised);
+signed keyless field APK rebuilt (`Calibre Map V4.3.5 (keyless - field).apk`, CONTENT_VERSION 8).
+**Open.** Harness `/api/export` is the production source for `dataset.assessment` (this run used a file
+generated from the validated consensus).
 
 ---
 
@@ -77,10 +80,9 @@ Cab & body net so system-specific parts (coolant hose, spring U-bolt) don't wron
 Residual Unclassified is mostly correct-to-be (generic seals/fasteners; P1130 also shop tools/PPE/consumables).
 Deliverables: `P1120_final_categorised.csv`, `P1130_final_categorised.csv` (scratchpad; to be filed into each project).
 
-**Propagation (Type D — 5 copies).** Done: `engine.js`, viewer `CAT_ORDER`, engine `index.html` `CATS`,
-harness `app/vocab.py` `CATEGORIES`. **PENDING (flagged, not silently skipped):** field app
-`build_app.py` `act_cat` parity + a "Cab & body" cab-zone mapping in `app_template.html` + APK rebuild —
-deferred to the app's next build cycle (separate signed deploy; not needed for the analysis toolchain).
+**Propagation (Type D — 5 copies) — ALL DONE:** `engine.js`, viewer `CAT_ORDER` + Cab/Deck zones,
+engine `index.html` `CATS`, harness `app/vocab.py` `CATEGORIES`, and the field app (`app_template.html`
+Cab/Deck zones + `build_app.py` reads category from the canonical) shipped in **app V4.3.5** (2026-08-31).
 
 ---
 
