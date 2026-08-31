@@ -4,6 +4,25 @@ Reverse-chronological. Each entry: what changed, why, and how to roll back. `eng
 
 ---
 
+## 2026-08-31 · Viewer part detail — "Where used & likely fit" (parity with the app's fits-map)
+
+**Why.** After the UI pass the operator flagged two losses on the **viewer** (the app was verified
+intact — full drill + "What does this fit?" bar both present): (1) the where-used list had been
+**collapsed** by the new accordion, and (2) the viewer never had the app's **likely-fit** view.
+
+**Changed (`viewer.html`, `partView`).** The where-used section became **"Where used & likely fit"**:
+- **Observed** units (from `where_used`, WO-confirmed) render **visible by default** (green left-border),
+  each foldable to its WO cards (description-first). No longer hidden behind a click.
+- **Likely-fit candidates** — every fleet unit of the **same make/model** (`vFleetGroup`) as the units
+  where the part was actually issued, minus the observed ones, grouped by make/model as chips. This is
+  the WO-grounded "association" the app's fits-map shows, now in the viewer.
+
+**Verify.** Loaded the real canonical: `partView` renders the observed list visible + 28 likely-fit
+candidate chips, no JS errors. The Fleet & Units drill (unit→system→sub-system→part) was re-confirmed
+usable (7 systems → 8 sub-systems → 27 parts). `engine.js` untouched.
+
+---
+
 ## 2026-08-31 · UI review pass — `viewer.html` (mirrors the field app)
 
 **Why.** Operator UI review (deck `App/2026_08_31 UI review/`) — a consistent hierarchy across
