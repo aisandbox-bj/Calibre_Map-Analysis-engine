@@ -4,6 +4,209 @@ Reverse-chronological. Each entry: what changed, why, and how to roll back. `eng
 
 ---
 
+## 2026-09-24 · engine.js **0.8.6** — per-part `served` config sets (Parts-Mapping fit ladder)
+
+**What:** in `assembleCanonical`, each material gains `served = {eng:[], trans:[], axle:[], ratio:[]}` — the
+engine/transmission/axle-model + diff-ratio values it has been **consumed against**, rolled up from its
+where-used units' build specs (`buildBy` from `fleet[].build`, normalised uppercase/space-collapsed). Emitted on
+**1,327** materials on the 09-21 drop. This is the deterministic basis for the Viewer/app **fit ladder** —
+High = used on this unit · Medium = `served` matches this unit's config on the dimension relevant to the part's
+category (i.e. used on sibling-config units) · Low = catalogue/category only · N/A = unit has no build spec.
+**Why:** turns the unit drill-down from a category dump into a confidence-ranked list (the planner search-time
+value driver). **GOLDEN EXACT + VERIFY OK held** (additive; movers/consumption untouched). **Rollback:** remove
+the `served` precompute + `out.served` line in `assembleCanonical`. `ENGINE_VERSION` 0.8.5 → **0.8.6**.
+Viewer/app apply the same tiny tiering rule (`fitStage`/`fitStageV`, `FIT_DIM` by category).
+
+## 2026-09-23 · engine.js **0.8.5** — planner unit build-specs → `fleet[].build` (viewer + app)
+
+**What:** new `buildUnitSpecs(fleet, specRows)` attaches a per-unit **build** block to each matching fleet unit —
+`engine{make,model,esn}`, `transmission{make,model,sn}`, `diffs[{pos,make,model,ratio,sn}]`, `cab`, `chassis`,
+`serial`, `source`, `asOf`. Source = the planner's "Semi-Truck Subcomponent & Unit Specs" drop, normalised by
+`build_unit_specs.py` → `Analysis/unit_build_specs.csv`, read by `refresh.js` and passed to the engine. When the
+register had no engine string, the planner engine make/model backfills `u.engine` (strengthens the fleet lens).
+`fleet[]` is emitted wholesale so `build` flows to the canonical; **114 units** carry it on the 09-21 drop.
+**Provenance scheme** (rendered by app + viewer): value present = planner (blue), absent = unknown (orange),
+device-confirmed = field-verified (green). **GOLDEN EXACT + VERIFY OK held** (additive to fleet units only).
+**Why:** build-spec identity is the evidence layer for accurate part cross-referencing (scoping note in the
+Material ID project). **Rollback:** revert `buildUnitSpecs` + its call in refresh.js; remove `unit_build_specs.csv`.
+Viewer: `renderUnitBuild(u)` (read-only panel). `ENGINE_VERSION` 0.8.4 → **0.8.5**.
+
+## 2026-09-23 · engine.js **0.8.4** — `materials[].fleet` tag emitted (mat_fleet.json retired)
+
+**What:** materials carry `fleet` (TT/TL/TT&TL/Other) + `fleet_basis` (where-used / scope-provisional / scope /
+unknown), derived from where-used unit types (authoritative) else the register `scope`. Family fleet = union of
+members. Retires the hand-kept `mat_fleet.json` (build_app reads `m.fleet`). GOLDEN EXACT held. Rollback: revert
+the fleet block in `assembleCanonical`. `ENGINE_VERSION` 0.8.3 → 0.8.4.
+
+## 2026-09-23 · engine.js **0.8.3** — full duplicate-family set into the canonical + app single-source (viewer ↔ app parity)
+
+**Why.** The app rendered **61** duplicate families (from `Analysis/duplicate_families.csv` +
+`App/data/fam_verified.json` + `fam_extra.json`), but the viewer reads `canonical.families`, which the
+engine only populated from field-verified capture verdicts — **and those doubled** (a bundle folded
+twice), so the viewer showed "4" (really 2 families ×2). App and viewer disagreed on the same client's
+duplicates. Operator: reconcile the families **via the engine** (never a hand-edit — sole-author rule).
+
+**What (additive).** `assembleCanonical` now (1) **dedupes** field families by `family_id`, and (2) folds
+a new input `dataset.catalogue_families` in **UNDER** field + research families — skipped if the
+`family_id` is already present or any member sits in a higher-precedence family. Catalogue families carry
+`verdict` + `part` + `cert` + `fleet` + `note`/`site_q`/`unsure` but **no per-member survivor** (desk
+level), so members are emitted `{material, keep:false}` and the family is tagged `source:'catalogue'`.
+`refresh.js` parses the three sources into `catalogue_families` (I/O in the harness; authoring in the
+engine). **0.8.3** then attaches the catalogue display metadata (`part`/`skus`/`combined_oh`/`cert`/
+`fleet`/`unsure`/`site_q`) to the **field** families too (matched by `family_id`), so `canonical.families`
+is the COMPLETE family record for BOTH tools. `SCHEMA_VERSION` stays **1.1.0** (additive);
+`engineVersion` → **0.8.3**.
+
+**Viewer (Type A propagation).** `dupHome` and `dupPanel` branch on `source`: field families keep the
+KEEP/retire·pile rendering; catalogue families render as candidates (verdict + part + members + cert +
+Site Q, no fabricated survivor). Header now "Verified families — N · X bench-verified · Y desk-verified".
+
+**Result / verify.** Canonical `families` = **61 distinct** (2 field + 59 catalogue) on the 2026-09-21
+drop; **VERIFY OK**, derive **GOLDEN EXACT (2062 movers)** — consumption math untouched. Viewer
+render-checked (list + part-lookup box). **App migrated (single source):** `build_app.py` now reads the
+family set from `canonical.families` (was re-parsing `duplicate_families.csv` + `fam_verified.json` +
+`fam_extra.json`); rebuild parity verified — **61/61**, F001 and the field families identical field-for-field
+(`n/part/skus/oh/vd/vnote/cert/flt/uns/sq`). APK V4.4.0 rebuilt, integrity gate passed. Both tools now read
+ONE family record. (The three source files remain the human-edited inputs the engine folds; only the
+readers changed.)
+
+**Roll back.** Revert engine.js `assembleCanonical` (drop the dedupe + catMeta attach + `catalogue_families`
+block, restore `ENGINE_VERSION` 0.8.1), the `refresh.js` `buildCatalogueFamilies` block, the two
+`viewer.html` branches, and `build_app.py`'s family reader (back to the `duplicate_families.csv` loop +
+`fam_verified`/`fam_extra` overlay); re-run `refresh.js --drop 2026_09_21 --build-app`.
+
+---
+
+## 2026-09-22 · engine.js **0.8.1** — bin locations into the canonical (app + viewer, one source)
+
+**Why.** Bins were app-only (build_app.py globbed `Bin Locations*.xlsx`), so the viewer showed
+none, and a fresh extract named `SAP BIN LOC*` in a dated subfolder wasn't even discovered.
+Operator dropped a fresh bin extract and asked for it in the JSON, then app + viewer.
+
+**What (additive).** `buildBins(rows)` → `{mn: ["<section> · <bin>", …]}` (label logic ported from
+build_app.py: section·bin, storage-type prefix only when not the main WHM1). `enrich()` accepts
+`opts.binsByMat` → sets `m.bins`; `toCanonicalMaterials` emits `material.bin` (array; empty = zero
+stock / no bin); `assembleCanonical` meta gains `binsAsOf`. `SCHEMA_VERSION` stays 1.1.0 (additive);
+`engineVersion` → 0.8.1. `viewer.html` Stock & MRP card now shows the bin(s) + "dynamic slot · as of
+<binsAsOf> · check SAP if empty", or "— no bin (zero stock)".
+
+**Blast radius.** Consumption math untouched — **golden EXACT** on the 2026-09-21 drop. The refresh
+harness discovers the newest bin file across ALL drop folders and threads it through; build_app.py now
+reads bins from the canonical (single source, no more glob). Live: 2,920 fleet materials carry bins
+(as of 2026-09-22), rendered in both viewer and app (console clean). Rollback:
+`engine.js.bak-0.7.2-2026-09-21` (pre-0.8.x) or git.
+
+---
+
+## 2026-09-21 · engine.js **0.8.0** / schema **1.1.0** — engine becomes the SOLE canonical author (review repair P1)
+
+**Why.** The code review found the canonical had grown a second producer (a Python assembler in the
+Material ID project) because the engine could not do three things: carry register parts that never
+moved (derive() only yields movers, and the UI filtered `netAll<=0`), map its own internal shape to the
+canonical shape (that lived in index.html, so every harness re-implemented it), and carry identity /
+unit-configuration fields. This release closes all three so `assembleCanonical` is again the only writer.
+
+**What (all additive; consumption math untouched).**
+- `seedRegister(materials, rows, keyCol)` — unions the fleet register into the materials map as
+  zero-consumption entries (`_seeded`), so dead stock is visible.
+- `toCanonicalMaterials(materials, {includeNonMovers})` — the internal→canonical mapping, now owned
+  here. Emits `moved` (true/false) and, when a register was supplied, `brand · oem_pn · crosses ·
+  duplicate_family · scope`.
+- `enrich()` gains `opts.identityByMat` (consolidated-register rows): sets those identity fields, uses
+  the register description/category as fallbacks (so seeded parts classify), maps `duplicate_family`
+  onto `dupGroup` (the field the viewer reads), and accepts INV MSTR's real column name
+  **`Unrestricted`** alongside the legacy `OnHand`.
+- `buildEquipSpec()` + `buildEquipEvidence(fleet, brakeRows)` — unit-configuration template and
+  work-order/engine evidence; owner moved here from `build_app.py`. Attaches `fleet[].spec{v,h}`.
+- `assembleCanonical` emits top-level `equipSpec` and new counts `movers · zeroStock ·
+  unitsWithSpecEvidence`. `SCHEMA_VERSION` 1.0.0 → **1.1.0**; `engineVersion` → 0.8.0.
+- Removed the unreferenced back-compat export `categoryFor()`.
+
+**Validated.** Golden regression on the real 2026-09-21 MB51+IW39: `derive()` output of 0.7.2 vs 0.8.0 —
+**5,522 materials, 0 records differ (EXACT)**. Synthetic unit test of seeding / identity / evidence /
+assembly. Live: the Material ID refresh harness (`Deliverables/build/refresh.js`) now builds the whole
+canonical through this engine — 3,861 parts, 1,511 movers, 941 zero-stock, 122 units with evidence,
+schema 1.1.0 — and the viewer renders identity + configuration from it. Rollback:
+`engine.js.bak-0.7.2-2026-09-21`. **index.html still uses its own inline mapping** (behaviour unchanged);
+switching it to `toCanonicalMaterials` is the follow-up that removes the last duplicate.
+
+---
+
+## 2026-09-21 · viewer.html — Identity card reads the 1.1.0 identity fields
+
+`partView` Identity card now shows **OEM / vendor PN** (`oem_pn` → `pn`), **True brand** (`brand` →
+`traced_brand`), **Cross-refs** (`crosses`) and **Identity / fits** when present, and a **Status** line
+that distinguishes "in material master" from "known part · never issued on a fleet work order"
+(`moved === false`). Backward-compatible with 1.0.0 datasets (falls back to the old fields). Fixes the
+"Vendor PN —" symptom at its root.
+
+---
+
+## 2026-09-21 · viewer.html — work-order **roll-out cards** in Where-used (Type A, mirror of app FEAT-40)
+
+**Why.** Operator: a clicked work order "ugly-ly just shows some text" — wanted a card that draws
+attention (WO no · header text · qty · etc.). Design settled in the field app first (owner), mirrored here.
+
+**What.** `vWoCard(w, unit)` replaces the inline `.wos` text rows under "Where used & likely fit". Compact
+one-liner (**WO no · header text · × qty · ▼**) that **rolls out on click** into an accent card: header text
+large, then fact cells Work order · Qty issued · Posted · Unit (make/model). Same CSS block as the app
+(`.wocard/.woh/.wob/.wogrid`, accent cell `woacc` — deliberately not `acc`, which is the app's accordion class).
+Click is `stopPropagation`'d so the enclosing unit toggle is unaffected.
+
+**Blast radius.** Viewer display only; reads the existing `where_used[].wos` shape. Rollback:
+`viewer.html.bak-prebuild-2026-09-21`. **Validated** live on 1035908 → WO 44262 "REPLACE AXLE 2
+DIFFERENTIAL" · qty 1 · 2026-09 · TT3092 Peterbilt 388, pixel-parity with the app; console clean.
+
+---
+
+## 2026-09-21 · viewer.html — read-only unit **Configuration** panel (Type A + B)
+
+**Why.** The field app has Equipment Verification (unit spec: driveline/trans/axles/brakes/engine/cab
+/trailer); the viewer showed nothing of it. Operator asked the viewer to show each unit's config —
+**the confirmed value, or "Unconfirmed"**.
+
+**What.** `unitView` now renders a Configuration card above "Pick a system", driven by two new
+canonical fields (additive, produced by the 2026-09-21 consolidated build): top-level `equipSpec`
+(the section/field template) and per-unit `fleet[].spec` = `{v:{field:{o,n}}, h:{field:note}}`
+(consumption-evidence-confirmed values + hints). Each field shows its confirmed value in green with
+the evidence note, or "Unconfirmed" in amber. `specKeysFor(u)` mirrors the app (tractor vs trailer
+sections). New CSS: `.cfgcard/.cfgsec/.cfgrow/.cfgk/.cfgv`.
+
+**Blast radius.** Viewer only + two additive canonical fields. **Backward-compatible**:
+`renderUnitConfig` returns '' when `equipSpec`/`spec` are absent, so datasets built before today
+render unchanged (verified). Field app already owns this data model (`build_app.py` `equip_spec` +
+`equip_ev`) — the canonical now carries the same, single-sourced. Rollback: `viewer.html.bak-prebuild-2026-09-21`.
+
+**Validated.** Served + loaded the 2026-09-21 canonical; TT3002 (engine-only evidence) and TT3004
+(brakes S-cam drum / Meritor Q/Q+ + ISX engine) render values in green with notes, remaining fields
+"Unconfirmed"; console clean.
+
+---
+
+## 2026-09-14 · engine.js 0.7.2 — research families fold in UNDER field-verified verdicts (contract)
+
+**Why.** The Assessment Tool's new duplicate-family **adjudicator** produces research candidate
+families. They must never contradict the bench: field-verified verdicts govern.
+
+**What.** `assembleCanonical` now reads `dataset.research_families` (the assessment tool's
+`/api/export` section) and appends each in the same families[] shape **only if none of its
+members already appears in a field-verified family** (member-based precedence). Every family
+carries `source: 'field' | 'research'`. Verdict strings stay the `verdictFromPiles` enums
+(SAME / SPLIT / ALL_DIFFERENT) so engine/viewer/app agree.
+
+**Blast radius.** Additive to `families[]` only — `materials`, consumption, scoreboard and the
+no-research path are untouched (golden **1428/1428** unaffected; the input is empty by default).
+Viewer/app render research families with the existing family shape; a `source` badge is an
+optional later display tweak.
+
+**Validated.** Node unit test: a research family overlapping a field family is suppressed, a
+disjoint one is kept + tagged `research`, the field family tagged `field`, materials unchanged;
+no-research path returns verification families intact.
+
+**Rollback.** Revert the `research_families` block in `assembleCanonical` + the version bump; no migration.
+
+---
+
 ## 2026-08-31 · Viewer part detail — "Where used & likely fit" (parity with the app's fits-map)
 
 **Why.** After the UI pass the operator flagged two losses on the **viewer** (the app was verified

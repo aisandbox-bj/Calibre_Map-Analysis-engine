@@ -31,9 +31,25 @@
     return String(v).slice(0, 7);
   }
 
+  // ── Column contract (0.8.0) ─────────────────────────────────────────
+  // SAP exports are matched by exact header text. A renamed column used to
+  // yield an EMPTY-but-successful result; now it fails loudly, naming the gap.
+  var COLS = {
+    IW39: ['Order', 'Sort Field', 'Description'],
+    MB51: ['Material', 'Movement Type', 'Order', 'Quantity', 'Posting Date'],
+    INV:  ['Material', 'Material Description']          // stock col is OnHand OR Unrestricted (checked separately)
+  };
+  function assertColumns(rows, cols, label) {
+    if (!rows || !rows.length) throw new Error(label + ': no rows');
+    var have = Object.keys(rows[0] || {}), miss = cols.filter(function (c) { return have.indexOf(c) < 0; });
+    if (miss.length) throw new Error(label + ': missing required column(s): ' + miss.join(', ') + ' — have: ' + have.slice(0, 10).join(' | '));
+    return true;
+  }
+
   // IW39 rows -> { woUnit[order]=unit, woDesc[order]=cleaned description }.
   // The WO description often repeats the unit as a prefix ("TT3103-..."); strip it.
   function indexIW39(rows) {
+    assertColumns(rows, COLS.IW39, 'IW39');
     var woUnit = {}, woDesc = {};
     (rows || []).forEach(function (d) {
       var o = s(d['Order']); if (!o) return;
@@ -55,6 +71,7 @@
   //   netAll:      material-level net of all 261/262 (may be < issPositive when a unit net-reverses)
   // }
   function derive(mb51Rows, iw39Index) {
+    assertColumns(mb51Rows, COLS.MB51, 'MB51');
     var woUnit = (iw39Index && iw39Index.woUnit) || {};
     var woDesc = (iw39Index && iw39Index.woDesc) || {};
     var use = {};     // mn -> unit -> {qty, wos:{order:{qty,ds}}}
@@ -227,14 +244,24 @@
     opts = opts || {};
     var inv = opts.invByMat || {}, tr = opts.tracedByMat || {};
     var hasInv = inv && Object.keys(inv).length > 0;
+    if (hasInv) {   // one representative INV row must carry the expected headers + a stock column
+      var sample = inv[Object.keys(inv)[0]];
+      assertColumns([sample], COLS.INV, 'INV MSTR');
+      if (!('OnHand' in sample) && !('Unrestricted' in sample)) throw new Error('INV MSTR: missing stock column (OnHand or Unrestricted)');
+    }
     Object.keys(materials).forEach(function (mn) {
       var m = materials[mn], i = inv[mn] || {}, t = tr[mn] || {};
+      var r = (opts.identityByMat || {})[mn];   // consolidated-register row (0.8.0), may be undefined
       // "identified" = present in the material master (INV MSTR). A consumed
       // material absent from the master is genuinely unknown → needs identification.
       if (hasInv) m.identified = !!inv[mn];
-      m.description  = s(i['Material Description']) || s(t['Description']) || '';
+      // description: INV MSTR → traced register → consolidated register (so the
+      // classifier below sees a description for seeded dead-stock parts too)
+      m.description  = s(i['Material Description']) || s(t['Description']) || (r ? s(r['description']) : '') || '';
       m.pn           = s(i['Manufacturer Part No.']) || s(t['PN']) || '';
-      m.onHand       = numOrBlank(i['OnHand']);
+      // SAP INV MSTR exports name the stock column "Unrestricted"; older derived
+      // CSVs used "OnHand". Accept both (0.8.0).
+      m.onHand       = numOrBlank(i['OnHand'] !== undefined ? i['OnHand'] : i['Unrestricted']);
       m.mrpType      = s(i['MRP Type']);
       m.rop          = numOrBlank(i['Reorder Point']);
       m.max          = numOrBlank(i['Maximum Stock Level']);
@@ -244,14 +271,197 @@
       // ── allocation fields (Fleet & Units drill) — additive ──
       // Category = the system-zone key: a master column ONLY if it names a real
       // system category, else keyword-classified from the description (app rules).
-      var mcat       = s(t['Category']) || s(i['Material Group']);
+      // traced register → consolidated register (analyst/trace-confirmed) → INV Material Group
+      var mcat       = s(t['Category']) || (r ? s(r['category']) : '') || s(i['Material Group']);
       if (CAT_SET[mcat]) { m.category = mcat; m.categoryConfidence = 'high'; m.categoryReason = 'master category'; }
       else { var cc = classifyCategory(m.description);
         // no keyword → a real "Unclassified" bucket (findable in Parts Mapping), NOT the review queue
         m.category = cc.category || 'Unclassified'; m.categoryConfidence = cc.confidence; m.categoryReason = cc.reason; }
       m.fits         = s(t['Trace fits']) || s(t['Trace identity']) || '';
+      // ── identity fields from the consolidated register (additive, 0.8.0) ──
+      // The register is SAP-MN keyed; columns: brand, oem_pn, crosses, fits,
+      // duplicate_family, scope. Absent register → these stay undefined.
+      if (r) {
+        m.brand      = s(r['brand']);
+        m.oemPn      = s(r['oem_pn']);
+        m.crosses    = s(r['crosses']);
+        m.dupFamily  = s(r['duplicate_family']);
+        m.scope      = s(r['scope']);
+        if (!m.fits) m.fits = s(r['fits']);
+        if (!m.pn) m.pn = m.oemPn;
+        if (!m.tracedBrand) m.tracedBrand = m.brand;
+        if (!m.dupGroup) m.dupGroup = m.dupFamily;   // viewer reads duplicate_group
+        // a register-listed part is a known part even if INV MSTR lacks a row
+        if (m.identified !== true && (m.brand || m.oemPn)) m.identified = true;
+      }
+      // bin locations (0.8.1) — dynamic slot(s) the part sits in; only in-stock parts
+      // appear in the bin extract, so a missing entry correctly means "no bin".
+      var bn = (opts.binsByMat || {})[mn];
+      if (bn && bn.length) m.bins = bn;
     });
     return materials;
+  }
+
+  // ── Bin locations (0.8.1) ───────────────────────────────────────────
+  // SAP bin extract rows → { mn: ["MAIN · MW02C02", ...] }. Label = section · bin,
+  // with the storage-type prefix only when it is not the main WHM1 warehouse
+  // (ported from build_app.py so the canonical carries bins for app AND viewer).
+  function buildBins(rows) {
+    var out = {};
+    (rows || []).forEach(function (r) {
+      var mn = s(r['Product']); var b = s(r['Storage Bin']);
+      if (!mn || !b) return;
+      var st = s(r['Storage Type']); var sec = s(r['Storage Section']);
+      var label = ((st === '' || st === 'WHM1') ? '' : st + ' ') + (sec ? sec + ' · ' : '') + b;
+      label = label.trim();
+      if (!out[mn]) out[mn] = [];
+      if (out[mn].indexOf(label) < 0) out[mn].push(label);
+    });
+    return out;
+  }
+
+  // ── Register seeding (0.8.0) ────────────────────────────────────────
+  // derive() only yields materials that MOVED. The fleet register also holds
+  // parts that never moved (dead stock) — they must be visible too. Union the
+  // register into the materials map as zero-consumption entries. Additive:
+  // existing mover records are untouched.
+  function seedRegister(materials, rows, keyCol) {
+    materials = materials || {}; keyCol = keyCol || 'material';
+    (rows || []).forEach(function (r) {
+      var mn = s(r[keyCol]); if (!mn || materials[mn]) return;
+      materials[mn] = { whereUsed: [], issPositive: 0, netAll: 0, _seeded: true };
+    });
+    return materials;   // callers count seeded parts via canonical `moved === false`
+  }
+
+  // ── Internal → canonical material mapping (0.8.0) ───────────────────
+  // Previously lived in index.html (so every harness re-implemented it).
+  // Owned by the engine now. includeNonMovers=true keeps zero-net (seeded /
+  // fully-reversed) parts so dead stock stays visible; the engine UI's
+  // historical behaviour is includeNonMovers=false.
+  function toCanonicalMaterials(materials, opts) {
+    opts = opts || {}; var inc = opts.includeNonMovers !== false;
+    var out = [];
+    Object.keys(materials).forEach(function (mn) {
+      if (mn.charAt(0) === '_') return;
+      var m = materials[mn]; if (!m || typeof m !== 'object') return;
+      var net = round1(m.netAll || 0);
+      if (!inc && net <= 0) return;
+      var wu = (m.whereUsed || []);
+      var o = {
+        material: mn, description: m.description || '', pn: m.pn || '',
+        net_consumed: net > 0 ? net : 0,
+        on_hand: (m.onHand === '' || m.onHand == null) ? null : m.onHand,
+        mrp_type: m.mrpType || '', rop: (m.rop === '' ? null : m.rop), max: (m.max === '' ? null : m.max),
+        traced_brand: m.tracedBrand || '', duplicate_group: m.dupGroup || '',
+        identified: m.identified === true,
+        category: m.category || 'Unclassified', category_confidence: m.categoryConfidence || 'none',
+        category_reason: m.categoryReason || '', fits: m.fits || '',
+        where_used: net > 0 ? wu : [], consuming_units: net > 0 ? wu.length : 0,
+        consumed_by_unit: net > 0 ? wu.map(function (w) { return w.unit + ': ' + w.qty; }).join('; ') : ''
+      };
+      // identity block (present only when a register was supplied)
+      o.bin = m.bins || [];   // dynamic bin label(s), "as of" meta.binsAsOf; empty = zero-stock/no bin
+      if (m.brand !== undefined) { o.brand = m.brand; o.oem_pn = m.oemPn; o.crosses = m.crosses;
+        o.duplicate_family = m.dupFamily; o.scope = m.scope; }
+      if (m._seeded) o.moved = false; else o.moved = net > 0;
+      out.push(o);
+    });
+    out.sort(function (a, b) { return a.material < b.material ? -1 : a.material > b.material ? 1 : 0; });
+    return out;
+  }
+
+  // ── Unit configuration: spec template + evidence (0.8.0) ────────────
+  // Owner moved here from build_app.py so the canonical carries it and the
+  // viewer/app read one source. Field keys are "<section>.<k>".
+  function buildEquipSpec() {
+    return {
+      driveline: { label: 'Driveline', fields: [
+        { k: 'tandem', label: 'Tandem axle series', opts: ['Meritor RT46-160', 'Spicer D46-170', 'Eaton-Spicer DS461', 'Single axle', 'Other'] },
+        { k: 'ratio', label: 'Diff ratio (off diff tag)', opts: ['4.10', '4.30', '7.17', 'Other'] },
+        { k: 'pto', label: 'PTO make', opts: ['Chelsea 270/271', 'Chelsea 272', 'Muncie', 'None', 'Other'] } ] },
+      transmission: { label: 'Transmission', fields: [
+        { k: 'trans', label: 'Make/model (dataplate)', opts: ['Fuller RTLO-18918B', 'Fuller RTLO-20918B', 'Allison 4500 RDS', 'Other'] } ] },
+      axles: { label: 'Axle setup', fields: [
+        { k: 'steer', label: 'Steer axle class', opts: ['Standard (Meritor MFS)', 'Marmon-Herrington AWD MT-22', 'Light 6-8K Intl double-drawkey', 'Other'] },
+        { k: 'kingpin', label: 'King pin class', opts: ['Meritor MFS Type-B (1.999")', 'Light 1.359"', 'Unknown'] } ] },
+      brakes: { label: 'Brake setup', fields: [
+        { k: 'found', label: 'Foundation', opts: ['S-cam drum', 'ADB22X air disc'] },
+        { k: 'shoes', label: 'Shoe system', opts: ['Meritor Q/Q+', 'Eaton ES/ES-II', 'Hendrickson HXS', 'n/a (disc)'] },
+        { k: 'chambers', label: 'Chamber stroke', opts: ['Std 2.5"', 'Long 3.0"', 'Mixed'] },
+        { k: 'slack', label: 'Slack arm length', opts: ['5.5"', '6"', '6.5"', 'Other'] },
+        { k: 'dryer', label: 'Air dryer model', opts: ['Bendix AD-9', 'AD-IP/AD-IS', 'AD-9si', 'WABCO System Saver', 'SKF Brakemaster', 'Haldex PURest', 'Midland Aerofiner II', 'Other'] } ] },
+      engine: { label: 'Engine', fields: [
+        { k: 'serial', label: 'Serial prefix (dataplate)', opts: ['6NZ/9NZ (C15 single-turbo)', 'MXS (C15 ACERT)', 'BXS (C15 ACERT)', 'ISX', 'MX-13', 'DD15/16/S60', 'Other'] } ] },
+      cab: { label: 'Cab / winter', fields: [
+        { k: 'fired', label: 'Fired heater', opts: ['Webasto Thermo Top EVO', 'Webasto Air Top 2000ST', 'Espar Airtronic', 'None', 'Other'] },
+        { k: 'block', label: 'Block heater fitted', opts: ['Yes', 'No', 'Unknown'] } ] },
+      trailer: { label: 'Trailer systems', fields: [
+        { k: 'abs', label: 'WABCO ABS config', opts: ['Basic 2S/1M (4005001010)', 'Enhanced 2S/2M (4005001020)', 'Other/Non-WABCO'] },
+        { k: 'susp', label: 'Suspension family', opts: ['Neway AD-series', 'Hendrickson RS650', 'Hendrickson INTRAAX', 'Ridewell', 'Spring', 'Other'] },
+        { k: 'gear', label: 'Landing gear', opts: ['Holland Mark V XA-S9-3A115', 'Holland Mark V XA-S9-4F115', 'Other'] },
+        { k: 'spindle', label: 'Spindle family', opts: ['TN 6.000"', 'TP 6.008"', 'Unknown'] } ] }
+    };
+  }
+  // Attach spec evidence to each fleet unit: spec = { v:{field:{o,n}}, h:{field:note} }
+  // brakeRows = unit_brake_evidence.csv rows (Unit, Foundation brake inference,
+  // Evidence (qty), Mixed-system flag). Engine evidence from the fleet engine string.
+  function buildEquipEvidence(fleet, brakeRows) {
+    var BRAKE = { 'Meritor': 'Meritor Q/Q+', 'Eaton': 'Eaton ES/ES-II', 'Hendrickson': 'Hendrickson HXS' };
+    var ENG = [['ISX', 'ISX'], ['MX-13', 'MX-13'], ['MX13', 'MX-13'], ['DD15', 'DD15/16/S60'], ['DD16', 'DD15/16/S60'],
+               ['DETROIT 60', 'DD15/16/S60'], ['S60', 'DD15/16/S60'], ['C15', '6NZ/9NZ (C15 single-turbo)'], ['6NZ', '6NZ/9NZ (C15 single-turbo)']];
+    var ev = {};
+    function V(u, f, o, n) { (ev[u] = ev[u] || { v: {}, h: {} }).v[f] = { o: o, n: n }; }
+    function H(u, f, n) { (ev[u] = ev[u] || { v: {}, h: {} }).h[f] = n; }
+    (brakeRows || []).forEach(function (r) {
+      var u = s(r['Unit']); if (!u) return;
+      var inf = s(r['Foundation brake inference']), q = s(r['Evidence (qty)']);
+      if (s(r['Mixed-system flag'])) H(u, 'brakes.shoes', 'MIXED consumption evidence (' + q + ') — verify axle by axle');
+      else if (BRAKE[inf]) { V(u, 'brakes.shoes', BRAKE[inf], 'work-order consumption: ' + q); V(u, 'brakes.found', 'S-cam drum', 'work-order consumption: ' + q); }
+      else if (q) H(u, 'brakes.found', 'consumption evidence: ' + q);
+    });
+    (fleet || []).forEach(function (u) {
+      var e = String(u.engine || '').toUpperCase();
+      for (var i = 0; i < ENG.length; i++) { if (e.indexOf(ENG[i][0]) >= 0) { V(u.unit, 'engine.serial', ENG[i][1], 'fleet register engine: ' + u.engine); break; } }
+      u.spec = ev[u.unit] || { v: {}, h: {} };
+    });
+    return ev;
+  }
+
+  // ── Planner build-specs → fleet[].build (0.8.5) ───────────────────
+  // Attaches the planner's per-unit build spec (engine/transmission/diffs/cab/
+  // chassis) to each matching fleet unit. Provenance scheme: a present value is
+  // PLANNER input; an absent one stays unknown; field-verified overlays later
+  // from device captures. Rows = unit_build_specs.csv (build_unit_specs.py).
+  function buildUnitSpecs(fleet, specRows) {
+    var by = {};
+    (specRows || []).forEach(function (r) { var u = s(r.unit || r.Unit); if (u) by[u] = r; });
+    var matched = 0;
+    (fleet || []).forEach(function (u) {
+      var r = by[u.unit]; if (!r) return;
+      matched++;
+      var diffs = [];
+      [1, 2, 3].forEach(function (i) {
+        var mk = s(r['diff' + i + '_make']), md = s(r['diff' + i + '_model']),
+            rt = s(r['diff' + i + '_ratio']), sn = s(r['diff' + i + '_sn']);
+        if (mk || md || rt || sn) diffs.push({ pos: i, make: mk, model: md, ratio: rt, sn: sn });
+      });
+      var b = {
+        engine: { make: s(r.engine_make), model: s(r.engine_model), esn: s(r.esn) },
+        transmission: { make: s(r.trans_make), model: s(r.trans_model), sn: s(r.trans_sn) },
+        diffs: diffs,
+        cab: s(r.cab), chassis: s(r.chassis), serial: s(r.serial), site: s(r.site),
+        source: s(r.source) || 'planner', asOf: s(r.as_of)
+      };
+      // only attach when there is real content
+      if (b.engine.make || b.engine.model || b.transmission.make || diffs.length || b.cab || b.chassis) {
+        u.build = b;
+        // strengthen the engine string used downstream (fleet lens + evidence) when the
+        // register had none — planner engine make/model is authoritative build data.
+        if (!s(u.engine) && (b.engine.make || b.engine.model)) u.engine = (b.engine.make + ' ' + b.engine.model).trim();
+      }
+    });
+    return matched;
   }
 
   // ── Fleet register → fleet[] (unit allocation attributes) ─────────
@@ -394,10 +604,35 @@
   // ── Phase 5: assemble the one canonical dataset (the shared contract) ──
   // Formalizes the computed pieces into a single versioned object the engine
   // emits, build_app.py packages, and the desktop viewer reads. Pure assembly.
-  var SCHEMA_VERSION = '1.0.0';
+  // 1.1.0 (2026-09-21, additive): materials may carry brand/oem_pn/crosses/
+  // duplicate_family/scope/moved; fleet[] may carry spec{v,h}; top-level equipSpec.
+  var SCHEMA_VERSION = '1.1.0';
+  var ENGINE_VERSION = '0.8.6';
   function assembleCanonical(dataset, meta) {
     dataset = dataset || {}; meta = meta || {};
     var mats = dataset.materials || [];
+    // ── fleet tag (roadmap: engine-emitted from where-used unit types + register scope; retires mat_fleet.json) ──
+    // where-used is authoritative (Tractor→TT, Trailer→TL, both→TT&TL); else the register scope
+    // (tractor-trailer → provisional TT&TL pending re-scope; light-vehicle / greater-fleet → Other; unknown → Other).
+    var unitType = {}; (dataset.fleet || []).forEach(function (u) { if (u && u.unit) unitType[u.unit] = u.type; });
+    function fleetOf(m) {
+      var tr = false, tl = false;
+      (m.where_used || []).forEach(function (w) { var t = unitType[w.unit]; if (t === 'Tractor') tr = true; else if (t === 'Trailer') tl = true; });
+      if (tr && tl) return ['TT&TL', 'where-used'];
+      if (tr) return ['TT', 'where-used'];
+      if (tl) return ['TL', 'where-used'];
+      var sc = m.scope || '';
+      if (sc === 'tractor-trailer') return ['TT&TL', 'scope-provisional'];
+      if (sc === 'light-vehicle' || sc === 'greater-fleet') return ['Other', 'scope'];
+      return ['Other', 'unknown'];
+    }
+    var matFleet = {}; mats.forEach(function (m) { matFleet[m.material] = fleetOf(m); });
+    function famFleetUnion(mns) {
+      var tr = false, tl = false, any = false;
+      mns.forEach(function (mn) { var f = matFleet[mn]; if (!f || f[0] === 'Other') return; any = true;
+        if (f[0] === 'TT' || f[0] === 'TT&TL') tr = true; if (f[0] === 'TL' || f[0] === 'TT&TL') tl = true; });
+      if (tr && tl) return 'TT&TL'; if (tr) return 'TT'; if (tl) return 'TL'; return any ? 'TT&TL' : 'Other';
+    }
     // families ← field-verified verdicts (Phase 3)
     var families = (dataset.verification || []).filter(function (v) { return v.verdict; }).map(function (v) {
       var members = [];
@@ -409,8 +644,87 @@
       return {
         family_id: v.family_id, verdict: v.verdict, keep: v.keep || {}, retire: v.retire || [],
         provisional: !!v.provisional, tech: v.tech || '', ts: v.ts || '', site_answer: v.site_answer || '',
-        members: members
+        members: members, source: 'field'
       };
+    });
+    // research candidate families (assessment-tool adjudicator) fold in UNDER the
+    // field-verified verdicts: the bench governs. A research family is suppressed if
+    // ANY of its members already appears in a field-verified family (member-based
+    // precedence — research fills the not-yet-verified gap, never contradicts the bench).
+    // dedupe field families by family_id — dataset.verification[] can carry the same
+    // family twice when a capture bundle was folded more than once; keep the first.
+    (function () { var seen = {}; families = families.filter(function (f) { return seen[f.family_id] ? false : (seen[f.family_id] = 1, true); }); })();
+    // attach catalogue display metadata (part/skus/combined_oh/cert/fleet/unsure/site_q) to the
+    // field families too, so canonical.families is the COMPLETE family source for BOTH app + viewer
+    // (build_app.py reads it instead of re-parsing duplicate_families.csv / fam_verified / fam_extra).
+    var catMeta = {}; (dataset.catalogue_families || []).forEach(function (cf) { if (cf && cf.family_id) catMeta[cf.family_id] = cf; });
+    families.forEach(function (f) {
+      var cm = catMeta[f.family_id]; if (!cm) return;
+      f.part = cm.part || f.part || ''; f.skus = cm.skus || ''; f.combined_oh = cm.combined_oh || '';
+      f.cert = cm.cert || ''; f.fleet = cm.fleet || ''; f.unsure = cm.unsure || []; f.site_q = cm.site_q || '';
+      if (!f.site_answer && cm.note) f.site_answer = cm.note;
+    });
+    var fieldMembers = {};
+    families.forEach(function (f) { (f.members || []).forEach(function (m) { fieldMembers[m.material] = 1; }); });
+    (dataset.research_families || []).forEach(function (rf) {
+      if (!rf || !rf.verdict) return;
+      var mems = rf.members || [];
+      if (mems.some(function (m) { return fieldMembers[m.material]; })) return;   // bench wins
+      families.push({
+        family_id: rf.family_id, verdict: rf.verdict,
+        keep: rf.canonical_mat_id ? { '1': rf.canonical_mat_id } : {},
+        retire: mems.filter(function (m) { return !m.keep; }).map(function (m) { return m.material; }),
+        provisional: true, tech: '', ts: '', site_answer: rf.reasoning || '',
+        rating_questions: rf.rating_questions || [], members: mems, source: 'research'
+      });
+    });
+    // catalogue duplicate families (Analysis/duplicate_families.csv + fam_verified.json +
+    // fam_extra.json, parsed by refresh.js into dataset.catalogue_families) fold in UNDER
+    // field + research: bench/desk-capture win. Skipped when the family_id is already present
+    // or any member already sits in a higher-precedence family. They carry a verdict + cert
+    // but NO per-member survivor (desk level), so members are emitted without keep/pile and
+    // the family is flagged source:'catalogue' for the consumers to render as a candidate.
+    var haveFam = {}; families.forEach(function (f) { haveFam[f.family_id] = 1; });
+    (dataset.catalogue_families || []).forEach(function (cf) {
+      if (!cf || !cf.family_id || haveFam[cf.family_id]) return;
+      var mems = cf.members || [];
+      if (mems.some(function (m) { return fieldMembers[m.material]; })) return;
+      families.push({
+        family_id: cf.family_id, verdict: cf.verdict || '', keep: {}, retire: [],
+        provisional: true, tech: '', ts: cf.cert || '', site_answer: cf.note || '',
+        members: mems.map(function (m) { return { material: String(m.material), keep: false }; }),
+        part: cf.part || '', skus: cf.skus || '', combined_oh: cf.combined_oh || '', cert: cf.cert || '',
+        fleet: cf.fleet || '', unsure: cf.unsure || [], site_q: cf.site_q || '',
+        action: cf.action || '', source: 'catalogue'
+      });
+      haveFam[cf.family_id] = 1;
+    });
+    // fleet tag per family = union of its members' fleet (data-driven; overrides the fam_verified hint when members give a signal)
+    families.forEach(function (f) { var ff = famFleetUnion((f.members || []).map(function (m) { return m.material; })); if (ff !== 'Other') f.fleet = ff; });
+    // ── served config sets (0.8.6): the engine/trans/axle/ratio models a part has been
+    // consumed against, rolled up from its where-used units' build specs. This is the
+    // deterministic basis for the Viewer/app fit ladder (High=used here · Medium=served
+    // config matches this unit · Low=catalogue only · N/A=no data). Normalised so the
+    // app/viewer match unit build values the same way.
+    var _normC = function (s) { return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim(); };
+    var buildBy = {}; (dataset.fleet || []).forEach(function (u) { if (u && u.build) buildBy[u.unit] = u.build; });
+    function unitDims(b) {
+      var eng = _normC((b.engine && (b.engine.make + ' ' + b.engine.model)) || '');
+      var trans = _normC((b.transmission && (b.transmission.make + ' ' + b.transmission.model)) || '');
+      var axle = {}, ratio = {};
+      (b.diffs || []).forEach(function (d) { var a = _normC((d.make || '') + ' ' + (d.model || '')); if (a) axle[a] = 1; if (d.ratio) ratio[_normC(d.ratio)] = 1; });
+      return { eng: eng, trans: trans, axle: Object.keys(axle), ratio: Object.keys(ratio) };
+    }
+    var servedBy = {};
+    mats.forEach(function (m) {
+      var eng = {}, trans = {}, axle = {}, ratio = {};
+      (m.where_used || []).forEach(function (w) {
+        var b = buildBy[w.unit]; if (!b) return; var d = unitDims(b);
+        if (d.eng) eng[d.eng] = 1; if (d.trans) trans[d.trans] = 1;
+        d.axle.forEach(function (a) { axle[a] = 1; }); d.ratio.forEach(function (r) { ratio[r] = 1; });
+      });
+      var s = { eng: Object.keys(eng), trans: Object.keys(trans), axle: Object.keys(axle), ratio: Object.keys(ratio) };
+      if (s.eng.length || s.trans.length || s.axle.length || s.ratio.length) servedBy[m.material] = s;
     });
     // disposition status back onto each material
     var dispBy = {};
@@ -418,6 +732,8 @@
     var materials = mats.map(function (m) {
       var out = {}; Object.keys(m).forEach(function (k) { if (k.charAt(0) !== '_') out[k] = m[k]; });
       if (dispBy[m.material]) out.disposition = dispBy[m.material];
+      var ft = matFleet[m.material] || ['Other', 'unknown']; out.fleet = ft[0]; out.fleet_basis = ft[1];
+      if (servedBy[m.material]) out.served = servedBy[m.material];
       return out;
     });
     // fold the initial-assessment harness's category upgrades onto the audit result,
@@ -436,17 +752,22 @@
       meta: {
         tool: 'calibre-analysis-engine', generatedAt: meta.generatedAt || '',
         clientCode: meta.clientCode || '', site: meta.site || '',
-        sourceFiles: meta.sourceFiles || {}, phase: meta.phase || 5, engineVersion: '0.7.1'
+        sourceFiles: meta.sourceFiles || {}, phase: meta.phase || 5, engineVersion: ENGINE_VERSION,
+        binsAsOf: meta.binsAsOf || ''
       },
       counts: {
         materials: materials.length, families: families.length,
         dispositions: (dataset.duplicate_disposition || []).length,
         verifications: (dataset.verification || []).length, needsIdentification: needs.length,
-        units: (dataset.fleet || []).length, categoryReview: categoryReview.length
+        units: (dataset.fleet || []).length, categoryReview: categoryReview.length,
+        movers: materials.filter(function (m) { return (m.net_consumed || 0) > 0; }).length,
+        zeroStock: materials.filter(function (m) { return !(m.on_hand > 0); }).length,
+        unitsWithSpecEvidence: (dataset.fleet || []).filter(function (u) { return u.spec && (Object.keys(u.spec.v || {}).length || Object.keys(u.spec.h || {}).length); }).length
       },
       materials: materials,
       families: families,
       fleet: dataset.fleet || [],
+      equipSpec: dataset.equipSpec || undefined,
       verification: dataset.verification || [],
       duplicate_disposition: dataset.duplicate_disposition || [],
       scoreboard: dataset.scoreboard || null,
@@ -456,11 +777,15 @@
   }
 
   return {
-    version: '0.7.1',
+    version: ENGINE_VERSION,
     s: s, round1: round1, postingMonth: postingMonth, numOrBlank: numOrBlank,
     indexIW39: indexIW39, derive: derive, consumedByFamily: consumedByFamily,
     indexBy: indexBy, enrich: enrich, buildFleet: buildFleet,
-    classifyCategory: classifyCategory, categoryFor: categoryFor, applyAssessment: applyAssessment,
+    // 0.8.0 additions — column contract, register seeding, canonical mapping, unit configuration
+    assertColumns: assertColumns, COLS: COLS,
+    seedRegister: seedRegister, toCanonicalMaterials: toCanonicalMaterials, buildBins: buildBins,
+    buildEquipSpec: buildEquipSpec, buildEquipEvidence: buildEquipEvidence, buildUnitSpecs: buildUnitSpecs,
+    classifyCategory: classifyCategory, applyAssessment: applyAssessment,
     verdictFromPiles: verdictFromPiles, mergeVerification: mergeVerification,
     buildScoreboard: buildScoreboard, assembleCanonical: assembleCanonical, SCHEMA_VERSION: SCHEMA_VERSION
   };

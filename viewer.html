@@ -112,6 +112,25 @@ h3{font-family:var(--f-head);font-size:14px;margin:16px 0 8px;color:var(--text-m
 .tile.zero{opacity:.5}
 .tile.consumed .tic{background:rgba(35,181,138,.10);border-color:rgba(35,181,138,.35);color:var(--accent-glow)}
 .chev{margin-left:auto;color:var(--text-d);flex:none}
+/* ── unit configuration panel (read-only spec: value or Unconfirmed) ── */
+.cfgcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.cfgcard .cardh{font-family:var(--f-head);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--equip-t);margin-bottom:2px}
+.cfgcard .cardsub{font-family:var(--f-mono);font-size:10px;color:var(--text-d);margin-bottom:10px}
+.cfgsec{margin-top:10px}
+.cfgsec .cfgh{font-family:var(--f-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--map);margin:0 0 3px}
+.cfgrow{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.cfgrow:last-child{border-bottom:none}
+.cfgk{color:var(--text-m);font-size:13px}
+.cfgv{font-size:13px;text-align:right;font-weight:600;max-width:60%}
+.cfgv.ok{color:var(--equip-t)} .cfgv.warn{color:var(--warn)} .cfgv.plan{color:var(--map)}
+.fitb{font-family:var(--f-mono);font-size:9px;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em;border:1px solid var(--border);white-space:nowrap}
+.fitb.high{color:var(--equip-t);border-color:rgba(47,190,142,.5);background:rgba(47,190,142,.10)}
+.fitb.med{color:var(--map);border-color:rgba(55,138,221,.5);background:rgba(55,138,221,.10)}
+.fitgrp{display:flex;align-items:center;gap:8px;font-family:var(--f-head);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-m);margin:16px 0 8px}
+.fitgrp .c{margin-left:auto;font-family:var(--f-mono);font-weight:400;color:var(--text-d);font-size:11px}
+.fitgrp.lowtog{cursor:pointer;border-top:1px dashed var(--border);padding-top:12px}
+#lowlistV.closed{display:none}
+.cfgv .evn{display:block;font-weight:400;font-size:10.5px;color:var(--text-d);font-family:var(--f-mono)}
 .chev svg{width:18px;height:18px}
 
 /* ── part / unit detail ── */
@@ -139,6 +158,24 @@ h3{font-family:var(--f-head);font-size:14px;margin:16px 0 8px;color:var(--text-m
 .wu .uh{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:12.5px}
 .wu .uh b{color:var(--map)}
 .wu .wos{font-size:11px;color:var(--text-m);margin-top:3px;font-family:var(--f-mono)}
+/* ── work-order card (mirrors the field app): compact one-liner → rolls out on click ── */
+.wocard{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--map);border-radius:12px;margin:6px 0;overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.wocard:hover,.wocard.open{border-color:var(--map);box-shadow:0 0 0 1px rgba(55,138,221,.28),0 8px 22px rgba(55,138,221,.14)}
+.wocard .woh{display:flex;align-items:center;gap:10px;padding:10px 12px;min-height:44px}
+.wocard .wono{font-family:var(--f-mono);font-size:12px;color:var(--map);font-weight:700;letter-spacing:.04em;flex:none}
+.wocard .wodesc{flex:1;min-width:0;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--f-body)}
+.wocard.open .wodesc{visibility:hidden}
+.wocard .woqty{font-family:var(--f-head);font-weight:700;font-size:14.5px;color:var(--map);flex:none}
+.wocard .wochev{color:var(--text-d);transition:transform .2s;flex:none;font-size:12px}
+.wocard.open .wochev{transform:rotate(180deg);color:var(--map)}
+.wocard .wob{max-height:0;overflow:hidden;transition:max-height .25s ease,padding .2s;padding:0 12px}
+.wocard.open .wob{max-height:360px;padding:0 12px 14px}
+.wocard .wobig{font-family:var(--f-head);font-size:17px;font-weight:600;color:var(--text);margin:0 0 10px;line-height:1.3}
+.wocard .wogrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.wocard .wogrid .k{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-d)}
+.wocard .wogrid .v{font-size:14.5px;font-weight:600;color:var(--text);margin-top:2px;font-family:var(--f-body)}
+.wocard .wogrid .v.woacc{color:var(--map);font-size:20px;font-family:var(--f-head)}
+.wocard .wogrid .v.mono{font-family:var(--f-mono);font-size:13px}
 
 /* ── buttons ── */
 .primary{width:100%;min-height:48px;background:var(--map);color:#06121f;border:none;border-radius:12px;font-family:var(--f-head);font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;transition:filter .15s}
@@ -449,13 +486,14 @@ function dupBadge(m){
   if(g&&g.length>1) return `<span class="badge b-dup">dup family · ${g.length}</span>`;
   return '';
 }
-function partRow(m){
+function partRow(m, fitB){
   const mn=String(m.material);
   return `<div class="row" onclick="partView('${mn}')">
     <div style="flex:1;min-width:0">
       <div class="t">${esc(m.description||m.pn||mn)}${m.traced_brand?` <span style="color:var(--text-d);font-weight:400">· ${esc(m.traced_brand)}</span>`:''}</div>
       <div class="s"><span class="sap">SAP#</span> ${esc(mn)}${m.pn?` <b style="color:var(--map)">· ${esc(m.pn)}</b>`:''}</div>
       <div class="badges">
+        ${fitB||''}
         ${m.on_hand!=null&&+m.on_hand>0?`<span class="badge b-oh">On hand · ${esc(m.on_hand)}</span>`:''}
         ${m.net_consumed?`<span class="badge b-net">Net ${esc(nf(m.net_consumed))}</span>`:''}
         ${m.mrp_type?`<span class="badge b-mrp">MRP ${esc(m.mrp_type)}</span>`:''}
@@ -477,16 +515,19 @@ function partView(mn){
   <div class="factgrid">
     <div class="card"><div class="fh">Identity</div><div class="kv">
       <div class="k">SAP#</div><div class="v"><b>${esc(mn)}</b></div>
-      <div class="k">Vendor PN</div><div class="v"><b>${esc(m.pn||'—')}</b></div>
-      <div class="k">True brand</div><div class="v">${esc(m.traced_brand||'—')}</div>
+      <div class="k">OEM / vendor PN</div><div class="v"><b>${esc(m.oem_pn||m.pn||'—')}</b></div>
+      <div class="k">True brand</div><div class="v">${esc(m.brand||m.traced_brand||'—')}</div>
       <div class="k">Description</div><div class="v">${esc(m.description||'—')}</div>
-      <div class="k">Identity</div><div class="v">${m.identified===false?'<span style="color:var(--warn)">not in master — needs identification</span>':'in material master'}</div>
+      ${m.crosses?`<div class="k">Cross-refs</div><div class="v" style="font-family:var(--f-mono);font-size:12px">${esc(m.crosses)}</div>`:''}
+      ${m.fits?`<div class="k">Identity / fits</div><div class="v">${esc(m.fits)}</div>`:''}
+      <div class="k">Status</div><div class="v">${m.identified===false?'<span style="color:var(--warn)">not in master — needs identification</span>':(m.moved===false?'<span style="color:var(--text-m)">known part · never issued on a fleet work order</span>':'in material master')}</div>
     </div></div>
     <div class="card"><div class="fh">Stock &amp; MRP</div><div class="kv">
       <div class="k">On hand</div><div class="v">${esc(m.on_hand==null?'—':nf(m.on_hand))}</div>
       <div class="k">Net consumed</div><div class="v">${esc(m.net_consumed==null?'—':nf(m.net_consumed))}</div>
       <div class="k">MRP / ROP / Max</div><div class="v">${esc(m.mrp_type||'—')} · ${m.rop==null?'—':esc(m.rop)} · ${m.max==null?'—':esc(m.max)}</div>
       <div class="k">Consuming units</div><div class="v">${esc(m.consuming_units!=null?m.consuming_units:wu.length)}</div>
+      <div class="k">Bin</div><div class="v">${ (m.bin&&m.bin.length) ? esc(m.bin.join('  ·  '))+`<span style="display:block;font-size:10.5px;color:var(--text-d);font-family:var(--f-mono)">dynamic slot · as of ${esc((DATA.meta&&DATA.meta.binsAsOf)||'?')} · check SAP if empty</span>` : '<span style="color:var(--text-d)">— no bin (zero stock)</span>' }</div>
       <div class="k">Dup group</div><div class="v">${esc(m.duplicate_group||'—')}</div>
     </div></div>
   </div>
@@ -494,7 +535,7 @@ function partView(mn){
   ${dupPanel(m)}
   <h3 style="color:var(--map)">Where used &amp; likely fit</h3>
   ${ wu.length ? `<div class="note" style="border-left:3px solid var(--ok);padding-left:10px"><b style="color:var(--ok)">Observed</b> — issued to ${wu.length} unit${wu.length>1?'s':''} on SAP work orders (MB51 261/262). Tap a unit to fold its work orders.</div>
-  <div class="wu">${ wu.slice(0,60).map(u=>{ const wid='vw_'+esc(mn)+'_'+String(u.unit).replace(/[^A-Za-z0-9]/g,''); const wos=(u.wos||[]); return `<div class="u"><div class="uh" style="cursor:pointer;border-left:3px solid var(--ok)" onclick="var e=document.getElementById('${wid}');e.style.display=e.style.display==='none'?'block':'none'"><span>${esc(u.unit)}${wos.length?' · '+wos.length+' WO'+(wos.length>1?'s':''):''}</span><b>${esc(nf(u.qty))}</b></div><div id="${wid}" style="display:block;padding:2px 0 6px 8px">${wos.slice(0,12).map(w=>`<div class="wos"><div style="color:var(--text);font-weight:600">${esc(w[3]||('WO '+w[0]))}</div><div style="font-size:12px"><span style="color:var(--text-d)">WO ${esc(w[0])}${w[2]?' · '+esc(w[2]):''}</span> <span style="color:var(--map);font-weight:600">· qty ${esc(nf(w[1]))}</span></div></div>`).join('')||'<div class="wos" style="color:var(--text-d)">no work-order detail</div>'}</div></div>`; }).join('') }</div>` : '<div class="note">No work-order issues recorded for this part in the dataset.</div>' }
+  <div class="wu">${ wu.slice(0,60).map(u=>{ const wid='vw_'+esc(mn)+'_'+String(u.unit).replace(/[^A-Za-z0-9]/g,''); const wos=(u.wos||[]); return `<div class="u"><div class="uh" style="cursor:pointer;border-left:3px solid var(--ok)" onclick="var e=document.getElementById('${wid}');e.style.display=e.style.display==='none'?'block':'none'"><span>${esc(u.unit)}${wos.length?' · '+wos.length+' WO'+(wos.length>1?'s':''):''}</span><b>${esc(nf(u.qty))}</b></div><div id="${wid}" style="display:block;padding:2px 0 6px 8px">${wos.slice(0,12).map(w=>vWoCard(w,u.unit)).join('')||'<div class="wos" style="color:var(--text-d)">no work-order detail</div>'}</div></div>`; }).join('') }</div>` : '<div class="note">No work-order issues recorded for this part in the dataset.</div>' }
   ${ (function(){ const observed=new Set(wu.map(u=>u.unit)); const groups=new Set(wu.map(u=>vFleetGroup(u.unit))); const cands=Object.keys(FLEETBYUNIT).filter(uid=>!observed.has(uid)&&groups.has(vFleetGroup(uid))); if(!cands.length) return wu.length?'':'<div class="note">No likely-fit units — this part has no work-order history to associate from.</div>'; const byG={}; cands.forEach(uid=>{ const g=vFleetGroup(uid); (byG[g]=byG[g]||[]).push(uid); }); return `<div class="note">Likely-fit <b>candidates</b> — the same make/model as the units where this part was actually issued (association, not yet proven by a work order on these units).</div><div class="wu">${Object.entries(byG).map(([g,us])=>`<div class="u"><div class="uh"><span>${esc(g)}</span><b>${us.length}</b></div><div style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 2px">${us.slice(0,40).map(uid=>`<span style="border:1px solid var(--text-d);border-radius:8px;padding:3px 8px;font-size:12px;font-family:ui-monospace,monospace;color:var(--text-m)">${esc(uid)}</span>`).join('')}${us.length>40?`<span style="color:var(--text-d);font-size:12px;align-self:center">+${us.length-40} more</span>`:''}</div></div>`).join('')}</div>`; })() }
   <button class="ghost" onclick="goBack()">← back</button>`;
   document.querySelectorAll('#main .dupmemb[data-mn]').forEach(el=>el.addEventListener('click',()=>partView(el.dataset.mn)));
@@ -509,6 +550,14 @@ function dupRow(mn, tag){
 function dupPanel(m){
   const fam=FAMBYMAT[String(m.material)];
   const sibs=(m.duplicate_group&&DUPINDEX[m.duplicate_group])?DUPINDEX[m.duplicate_group].filter(x=>String(x.material)!==String(m.material)):[];
+  if(fam && fam.source==='catalogue'){
+    const vlabel=fam.verdict==='SAME'?'<span class="pillv same">SAME → merge</span>':fam.verdict==='SPLIT'?'<span class="pillv split">SPLIT — keep separate</span>':'<span class="pillv">'+esc(fam.verdict||'—')+'</span>';
+    const others=(fam.members||[]).filter(mm=>String(mm.material)!==String(m.material));
+    return `<div class="warnbox"><b>Desk-verified · family ${esc(fam.family_id)}</b> ${vlabel}${fam.cert?' <span class="pillv">cert '+esc(String(fam.cert).slice(0,10))+'</span>':''}
+      ${fam.part?'<div style="margin:6px 0 2px;color:var(--text-m)">'+esc(fam.part)+'</div>':''}
+      <div class="note">Desk/MSW-stage grouping — verdict set, but the surviving SKU is not yet bench-decided. Confirm at the bin before merging in SAP.${fam.site_answer?' “'+esc(fam.site_answer)+'”':''}${fam.site_q?' <span style="color:var(--warn)">Site Q: '+esc(fam.site_q)+'</span>':''}</div>
+      ${others.map(mm=>dupRow(mm.material)).join('')}</div>`;
+  }
   if(fam){
     const vlabel=fam.verdict==='SAME'?'<span class="pillv same">SAME → merge</span>':fam.verdict==='SPLIT'?'<span class="pillv split">SPLIT — keep separate</span>':'<span class="pillv">'+esc(fam.verdict)+'</span>';
     const me=(fam.members||[]).find(mm=>String(mm.material)===String(m.material));
@@ -553,6 +602,56 @@ function vRelevant(m, uid){ const wu=m.where_used||[]; if(!wu.length) return fal
   if(wu.some(w=>w&&w.unit===uid)) return true; const g=vFleetGroup(uid); return wu.some(w=>w&&vFleetGroup(w.unit)===g); }
 function partsForUnit(uid, cats, kw){ const re=kw?new RegExp(kw,'i'):null;
   return (DATA.materials||[]).filter(m=> m.category && cats.indexOf(m.category)>=0 && (!re || re.test((m.description||'')+' '+(m.fits||''))) && vRelevant(m, uid)); }
+// One work-order card (mirrors the field app's woCardHtml). Collapsed one-liner
+// (WO no · header text · qty) → click rolls out: header text large + fact cells.
+// w = [wo, qty, "YYYY-MM", headerText]
+function vWoCard(w, unit){
+  const wo=esc(w[0]), qty=esc(nf(w[1])), when=esc(w[2]||''), hdr=esc(w[3]||'');
+  const fu=unit?FLEETBYUNIT[unit]:null;
+  const unitLbl=unit?esc(unit)+(fu?' <span style="color:var(--text-m);font-weight:400">'+esc([fu.make,fu.model].filter(Boolean).join(' '))+'</span>':''):'—';
+  return `<div class="wocard" onclick="event.stopPropagation();this.classList.toggle('open')">
+    <div class="woh"><span class="wono">WO ${wo}</span><span class="wodesc">${hdr||'Work order '+wo}</span><span class="woqty">× ${qty}</span><span class="wochev">▼</span></div>
+    <div class="wob"><div class="wobig">${hdr||'Work order '+wo}</div>
+      <div class="wogrid">
+        <div><div class="k">Work order</div><div class="v mono">${wo}</div></div>
+        <div><div class="k">Qty issued</div><div class="v woacc">${qty}</div></div>
+        <div><div class="k">Posted</div><div class="v">${when||'—'}</div></div>
+        <div><div class="k">Unit</div><div class="v">${unitLbl}</div></div>
+      </div></div></div>`;
+}
+// which spec sections apply to a unit type (mirrors the field app's Equipment Verification)
+function specKeysFor(u){ return (/trail/i.test(u.type||'')) ? ['brakes','trailer'] : ['driveline','transmission','axles','brakes','engine','cab']; }
+// read-only config panel: each field shows the confirmed value, or "Unconfirmed".
+function renderUnitBuild(u){
+  const b=u.build; if(!b) return '';
+  const row=(k,val)=>`<div class="cfgrow"><span class="cfgk">${esc(k)}</span><span class="cfgv ${val?'plan':'warn'}">${val?esc(val):'unknown'}</span></div>`;
+  const eng=[b.engine.make,b.engine.model].filter(Boolean).join(' ')+(b.engine.esn?' · ESN '+b.engine.esn:'');
+  const tr=[b.transmission.make,b.transmission.model].filter(Boolean).join(' ')+(b.transmission.sn?' · S/N '+b.transmission.sn:'');
+  const diffs=(b.diffs||[]).map(d=>row('Diff '+d.pos, [d.make,d.model].filter(Boolean).join(' ')+(d.ratio?' · '+d.ratio:''))).join('');
+  return `<div class="cfgcard"><div class="cardh">Build spec</div>
+    <div class="cardsub">${esc(b.source||'planner')} input${b.asOf?' · '+esc(b.asOf):''} · blue = planner-provided · amber = unknown · green (in the field app) = verified at the unit</div>
+    ${row('Engine', eng)}${row('Transmission', tr)}${diffs}${row('Cab', b.cab)}${row('Chassis', b.chassis)}${b.serial?row('VIN / serial', b.serial):''}
+  </div>`;
+}
+function renderUnitConfig(u){
+  const spec=DATA.equipSpec||{}; const ev=(u.spec)||{v:{},h:{}};
+  const keys=specKeysFor(u).filter(k=>spec[k]);
+  if(!keys.length) return '';
+  let conf=0, tot=0, secs='';
+  keys.forEach(k=>{ const sec=spec[k]; let rows='';
+    (sec.fields||[]).forEach(f=>{ tot++; const kk=k+'.'+f.k;
+      const v=ev.v&&ev.v[kk], h=ev.h&&ev.h[kk]; let val, cls, note='';
+      if(v){ conf++; cls='ok'; val=esc(v.o); if(v.n) note=`<span class="evn">${esc(v.n)}</span>`; }
+      else if(h){ cls='warn'; val='Unconfirmed'; note=`<span class="evn">${esc(h)}</span>`; }
+      else { cls='warn'; val='Unconfirmed'; }
+      rows+=`<div class="cfgrow"><span class="cfgk">${esc(f.label)}</span><span class="cfgv ${cls}">${val}${note}</span></div>`;
+    });
+    secs+=`<div class="cfgsec"><div class="cfgh">${esc(sec.label)}</div>${rows}</div>`;
+  });
+  return `<div class="cfgcard"><div class="cardh">Configuration</div>
+    <div class="cardsub">${conf} of ${tot} confirmed from work-order consumption evidence · the rest unconfirmed (verify at the unit)</div>
+    ${secs}</div>`;
+}
 function unitView(uid){
   const u=FLEETBYUNIT[uid]||{unit:uid};
   const consumed=(UNITINDEX[uid]||[]);
@@ -568,6 +667,8 @@ function unitView(uid){
   M.innerHTML = `
   <div class="hero"><div class="eyebrow-mono">${esc([u.type,u.year,u.engine].filter(Boolean).join(' · ')||'unit')}</div>
     <div class="pn">${esc(uid)} <span style="color:var(--map);font-weight:600;font-size:.62em">— ${esc([u.make,u.model].filter(Boolean).join(' ')||'not in fleet register')}</span></div></div>
+  ${renderUnitBuild(u)}
+  ${renderUnitConfig(u)}
   <h3 style="color:var(--map)">Pick a system</h3>
   <div class="tiles">${zoneTiles}</div>
   ${nc?`<div class="tile consumed" onclick="unitConsumed('${esc(uid)}')" style="margin-bottom:14px">
@@ -592,23 +693,48 @@ function zoneView(uid, zid){
   <div class="tiles">${tiles}</div>
   <button class="ghost" onclick="goBack()">← back</button>`;
 }
+/* Fit ladder (2026-09-24) — mirror of the field app: rank a sub-system's parts for a unit.
+   High = consumed on THIS unit · Medium = the part's served config (engine 0.8.6 parts[].served)
+   matches this unit on the dimension relevant to its category (used on sibling-config units) ·
+   Low = category/catalogue candidate · N/A (unit-level) = unit has no build spec. */
+const _nCv = s => String(s||'').toUpperCase().replace(/\s+/g,' ').trim();
+const FIT_DIM_V = { 'Engine & emissions':['eng'], 'Charging & starting':['eng'], 'Driveline':['axle','trans'], 'Brakes':['axle'], 'Wheel end':['axle'], 'Suspension & steering':['axle'] };
+function unitDimValsV(b){ const axle=[],ratio=[]; (b.diffs||[]).forEach(d=>{const a=_nCv((d.make||'')+' '+(d.model||'')); if(a)axle.push(a); if(d.ratio)ratio.push(_nCv(d.ratio));}); return {eng:_nCv((b.engine&&(b.engine.make+' '+b.engine.model))||''), trans:_nCv((b.transmission&&(b.transmission.make+' '+b.transmission.model))||''), axle, ratio}; }
+function fitStageV(u, m){
+  const uid=u.unit;
+  if((m.where_used||[]).some(w=>w&&w.unit===uid)) return 'high';
+  const b=u.build, sv=m.served;
+  if(b && sv){ const dims=FIT_DIM_V[m.category]||[], uv=unitDimValsV(b);
+    for(const dim of dims){ const uvals=dim==='eng'?[uv.eng]:dim==='trans'?[uv.trans]:uv[dim]; if(uvals.some(v=>v&&(sv[dim]||[]).includes(v))) return 'medium'; } }
+  return 'low';
+}
+const FIT_BADGE_V = { high:'<span class="fitb high">● used here</span>', medium:'<span class="fitb med">◆ fits config</span>', low:'' };
 function compView(uid, zid, ci){
   const u=FLEETBYUNIT[uid]||{unit:uid};
   const z=zonesFor(u).find(x=>x.id===zid); const ss=SUBSYS[zid];
   const comp = (ci>=0 && ss) ? ss[ci] : null;
   const cats = comp ? comp.cats : (z?z.cats:[]);
   const mk = String(u.make||'').toUpperCase().slice(0,6);
-  let parts = partsForUnit(uid, cats, comp?comp.kw:null);
-  parts.sort((a,b)=>{ const am=((a.fits||'')+(a.description||'')).toUpperCase().includes(mk)&&mk?0:1;
-    const bm=((b.fits||'')+(b.description||'')).toUpperCase().includes(mk)&&mk?0:1;
-    return am-bm || (Number(b.on_hand)||0)-(Number(a.on_hand)||0); });
+  const scored = partsForUnit(uid, cats, comp?comp.kw:null).map(m=>({m, s:fitStageV(u,m)}));
+  const rank={high:0,medium:1,low:2};
+  scored.sort((a,b)=>{ if(rank[a.s]!==rank[b.s])return rank[a.s]-rank[b.s];
+    const am=((a.m.fits||'')+(a.m.description||'')).toUpperCase().includes(mk)&&mk?0:1;
+    const bm=((b.m.fits||'')+(b.m.description||'')).toUpperCase().includes(mk)&&mk?0:1;
+    return am-bm || (Number(b.m.on_hand)||0)-(Number(a.m.on_hand)||0); });
+  const high=scored.filter(x=>x.s==='high'), med=scored.filter(x=>x.s==='medium'), low=scored.filter(x=>x.s==='low');
+  const noBuild=!u.build;
+  const grp=(label,arr)=>arr.length?`<div class="fitgrp"><span>${label}</span><span class="c">${arr.length}</span></div>${arr.slice(0,120).map(x=>partRow(x.m, FIT_BADGE_V[x.s])).join('')}`:'';
   crumb(uid+' · '+(comp?comp.l:(z?z.label:''))); here('comp:'+uid+':'+zid+':'+ci, ()=>compView(uid,zid,ci));
   M.innerHTML = `
   <div class="hero"><div class="eyebrow-mono">${esc(uid)}${z?' · '+esc(z.label):''}</div>
     <div class="pn" style="font-size:24px">${esc(comp?comp.l:(z?z.label:'Parts'))}</div>
-    <div class="dl">${parts.length} part${parts.length===1?'':'s'}${mk?' · '+esc(u.make)+'-matched first':''}</div></div>
-  ${parts.length?`<div class="list">${parts.slice(0,120).map(m=>partRow(m)).join('')}</div>`
-    :'<div class="note">No parts in this sub-system for the current dataset. Coverage grows as identity work categorises more of the material master.</div>'}
+    <div class="dl"><b style="color:var(--equip-t)">${high.length}</b> used here · <b style="color:var(--map)">${med.length}</b> fit this unit config · ${low.length} candidate${low.length===1?'':'s'}</div></div>
+  ${noBuild?`<div class="note" style="border-left:3px solid var(--warn)"><b style="color:var(--warn)">No build spec for ${esc(uid)}</b> — config-match (Medium) unavailable; showing used-here + candidates.</div>`:''}
+  ${(high.length||med.length||low.length)?`<div class="list">
+    ${grp('✓ Used on this unit', high)}
+    ${grp('◆ Fits this unit config', med)}
+    ${low.length?`<div class="fitgrp lowtog" onclick="document.getElementById('lowlistV').classList.toggle('closed');this.querySelector('.c2').textContent=document.getElementById('lowlistV').classList.contains('closed')?'show':'hide'"><span>Catalogue / category candidates</span><span class="c">${low.length} · <span class="c2">show</span></span></div><div id="lowlistV" class="closed">${low.slice(0,120).map(x=>partRow(x.m)).join('')}</div>`:''}
+  </div>`:'<div class="note">No parts in this sub-system for this unit. Coverage grows as identity work categorises more of the material master.</div>'}
   <button class="ghost" onclick="goBack()">← back</button>`;
 }
 function unitConsumed(uid){
@@ -634,18 +760,30 @@ function dupHome(){
   const fams=(DATA.families||[]);
   const vp=v=> v==='SAME'?'<span class="pillv same">SAME → merge</span>':v==='SPLIT'?'<span class="pillv split">SPLIT</span>':'<span class="pillv">'+esc(v)+'</span>';
   const cands=Object.entries(DUPINDEX).filter(([g,a])=>a.length>1).map(([g,a])=>({g,a})).sort((x,y)=>y.a.length-x.a.length);
-  const famHtml = fams.length ? `<div class="grid2">${fams.map(f=>`
-    <div class="fam"><div class="fh"><span class="fid">${esc(f.family_id)}</span>${vp(f.verdict)}${f.provisional?'<span class="pillv prov">no tech pref</span>':''}</div>
-      ${(f.members||[]).map(mm=>`<div class="memb" data-mn="${esc(mm.material)}"><span class="mnm">${esc(mm.material)}</span><span class="${mm.keep?'keep':'ret'}">${mm.keep?'KEEP':'retire'} · pile ${esc(mm.pile)}</span></div>`).join('')}
-      <div class="note">${f.tech?('by '+esc(f.tech)+' · '):''}${f.ts?esc(String(f.ts).slice(0,10)):''}${f.site_answer?' · “'+esc(f.site_answer)+'”':''}</div>
-    </div>`).join('')}</div>` : '<div class="note">No field-verified families in this dataset yet.</div>';
+  const memName=mn=>{ const s=MATBYMN[String(mn)]; return s?[s.pn||'', s.description||''].filter(Boolean).map(esc).join(' · '):''; };
+  const famCard=f=>{
+    const cat=f.source==='catalogue';
+    const tag=cat?(f.cert?'<span class="pillv">desk '+esc(String(f.cert).slice(0,10))+'</span>':'<span class="pillv cand">desk</span>')
+                 :(f.provisional?'<span class="pillv prov">no tech pref</span>':'');
+    const head=`<div class="fh"><span class="fid">${esc(f.family_id)}</span>${vp(f.verdict)}${tag}</div>`;
+    const mems=(f.members||[]).map(mm=>cat
+      ? `<div class="memb" data-mn="${esc(mm.material)}"><span class="mnm">${esc(mm.material)}</span><span style="color:var(--text-m);font-size:12px">${memName(mm.material)}</span></div>`
+      : `<div class="memb" data-mn="${esc(mm.material)}"><span class="mnm">${esc(mm.material)}</span><span class="${mm.keep?'keep':'ret'}">${mm.keep?'KEEP':'retire'} · pile ${esc(mm.pile)}</span></div>`).join('');
+    const partLine=(cat&&f.part)?`<div class="note" style="color:var(--text-m)">${esc(f.part)}</div>`:'';
+    const note=`<div class="note">${f.tech?('by '+esc(f.tech)+' · '):''}${(f.ts&&!cat)?esc(String(f.ts).slice(0,10)):''}${f.site_answer?((cat?'':' · ')+'“'+esc(f.site_answer)+'”'):''}${(cat&&f.site_q)?' · <span style="color:var(--warn)">Site Q: '+esc(f.site_q)+'</span>':''}</div>`;
+    return `<div class="fam${cat?' cand':''}" data-fid="${esc(f.family_id)}">${head}${partLine}${mems}${note}</div>`;
+  };
+  const nField=fams.filter(f=>f.source!=='catalogue').length;
+  const famHtml = fams.length
+    ? `<div class="note" style="margin:2px 0 10px">${fams.length} families · <b style="color:var(--ok)">${nField}</b> bench-verified (survivor set) · <b style="color:var(--warn)">${fams.length-nField}</b> desk-verified (verdict set, survivor to confirm at the bin)</div><div class="grid2">${fams.map(famCard).join('')}</div>`
+    : '<div class="note">No duplicate families in this dataset yet.</div>';
   const candHtml = cands.length ? `<div class="grid2">${cands.map(c=>`
     <div class="fam cand"><div class="fh"><span class="fid sm">${esc(c.g)}</span><span class="pillv cand">${c.a.length} candidates</span></div>
       ${c.a.map(s=>`<div class="memb" data-mn="${esc(s.material)}"><span class="mnm">${esc(s.material)}</span><span class="muted">${esc(s.pn||'')}${s.traced_brand?' · '+esc(s.traced_brand):''}</span></div>`).join('')}
     </div>`).join('')}</div>` : '<div class="note">No candidate groups in this dataset.</div>';
   M.innerHTML = `
   <h2 style="color:var(--verify-t)">Duplicate families</h2>
-  <h3>Field-verified — ${fams.length}</h3>${famHtml}
+  <h3>Verified families — ${fams.length}</h3>${famHtml}
   <h3 style="margin-top:20px">Candidate groups · desk hypothesis — ${cands.length}</h3>
   <div class="note" style="margin-bottom:10px">Parts sharing a duplicate group in the traced register — potential duplicates not yet physically verified. Tap any part to open its record.</div>${candHtml}
   <button class="ghost" onclick="goHome()">← home</button>`;
