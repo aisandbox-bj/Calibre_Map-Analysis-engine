@@ -4,6 +4,14 @@ Reverse-chronological. Each entry: what changed, why, and how to roll back. `eng
 
 ---
 
+## 2026-09-24 · engine.js **0.8.8** — `materials[].unit_cost` (INV_MSTR moving/standard price)
+
+**What:** `enrich` reads the SAP unit price from the INV MSTR row — **Moving price**, else **Standard price** —
+onto `m.unitCost`, and `toCanonicalMaterials` emits `unit_cost` (0 = not available). Populated on **3,172** of
+3,861 materials. Feeds the app's Duplicate-Families "sort by unit cost" (V4.5.3). **GOLDEN EXACT + VERIFY OK**
+(additive). **Rollback:** drop the `m.unitCost` line in `enrich` and `unit_cost` in `toCanonicalMaterials`.
+`ENGINE_VERSION` 0.8.7 → **0.8.8**.
+
 ## 2026-09-24 · engine.js **0.8.7** — provisional fleet tag refined with served/category context
 
 **What:** `fleetOf` now refines the **`scope-provisional` TT&TL** branch (parts tagged tractor-trailer from the

@@ -265,6 +265,8 @@
       m.mrpType      = s(i['MRP Type']);
       m.rop          = numOrBlank(i['Reorder Point']);
       m.max          = numOrBlank(i['Maximum Stock Level']);
+      // unit cost (SAP moving average price, else standard price); 0 = not available
+      m.unitCost     = (function () { var mp = numOrBlank(i['Moving price']), sp = numOrBlank(i['Standard price']); mp = (typeof mp === 'number') ? mp : 0; sp = (typeof sp === 'number') ? sp : 0; return mp > 0 ? mp : (sp > 0 ? sp : 0); })();
       m.tracedBrand  = s(t['Trace brand']);
       m.dupGroupId   = s(t['Duplicate group']);
       m.dupGroup     = s(t['Group label']);   // golden shows the human label, not the id
@@ -352,6 +354,7 @@
         material: mn, description: m.description || '', pn: m.pn || '',
         net_consumed: net > 0 ? net : 0,
         on_hand: (m.onHand === '' || m.onHand == null) ? null : m.onHand,
+        unit_cost: m.unitCost || 0,
         mrp_type: m.mrpType || '', rop: (m.rop === '' ? null : m.rop), max: (m.max === '' ? null : m.max),
         traced_brand: m.tracedBrand || '', duplicate_group: m.dupGroup || '',
         identified: m.identified === true,
@@ -607,7 +610,7 @@
   // 1.1.0 (2026-09-21, additive): materials may carry brand/oem_pn/crosses/
   // duplicate_family/scope/moved; fleet[] may carry spec{v,h}; top-level equipSpec.
   var SCHEMA_VERSION = '1.1.0';
-  var ENGINE_VERSION = '0.8.7';
+  var ENGINE_VERSION = '0.8.8';
   function assembleCanonical(dataset, meta) {
     dataset = dataset || {}; meta = meta || {};
     var mats = dataset.materials || [];
