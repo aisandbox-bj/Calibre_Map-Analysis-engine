@@ -4,6 +4,19 @@ Reverse-chronological. Each entry: what changed, why, and how to roll back. `eng
 
 ---
 
+## 2026-09-24 · engine.js **0.8.7** — provisional fleet tag refined with served/category context
+
+**What:** `fleetOf` now refines the **`scope-provisional` TT&TL** branch (parts tagged tractor-trailer from the
+register scope, no where-used) using deterministic context — **no LLM.** A part is downgraded **TT&TL → TT**
+(basis **`served-config`**) when it has engine/transmission **served** evidence OR sits in a **power-unit-only
+category** (`Engine & emissions`, `Charging & starting`, `Cab & body`) — because engines and cabs don't exist on
+trailers. `servedBy` was moved above the fleet-tag block so `fleetOf` can read it. **Effect on the 09-21 drop:**
+**TT 1,280 → 1,451 (+171), TT&TL 880 → 709 (−171)**; 171 parts move to basis `served-config`. Directly resolves
+the audit's systematic TT&TL-over-breadth flags (turbos, alternators, engine mounts, harnesses, cab parts).
+**GOLDEN EXACT + VERIFY OK held.** **Why:** implements the scoping note's "step 1" — re-scope with served
+context, deterministically. **Rollback:** revert the `sc === 'tractor-trailer'` branch of `fleetOf` to
+`return ['TT&TL','scope-provisional']`. `ENGINE_VERSION` 0.8.6 → **0.8.7**.
+
 ## 2026-09-24 · engine.js **0.8.6** — per-part `served` config sets (Parts-Mapping fit ladder)
 
 **What:** in `assembleCanonical`, each material gains `served = {eng:[], trans:[], axle:[], ratio:[]}` — the

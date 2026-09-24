@@ -607,7 +607,7 @@
   // 1.1.0 (2026-09-21, additive): materials may carry brand/oem_pn/crosses/
   // duplicate_family/scope/moved; fleet[] may carry spec{v,h}; top-level equipSpec.
   var SCHEMA_VERSION = '1.1.0';
-  var ENGINE_VERSION = '0.8.6';
+  var ENGINE_VERSION = '0.8.7';
   function assembleCanonical(dataset, meta) {
     dataset = dataset || {}; meta = meta || {};
     var mats = dataset.materials || [];
@@ -615,6 +615,32 @@
     // where-used is authoritative (Tractor→TT, Trailer→TL, both→TT&TL); else the register scope
     // (tractor-trailer → provisional TT&TL pending re-scope; light-vehicle / greater-fleet → Other; unknown → Other).
     var unitType = {}; (dataset.fleet || []).forEach(function (u) { if (u && u.unit) unitType[u.unit] = u.type; });
+    // ── served config sets (0.8.6) — the engine/trans/axle/ratio models a part has been consumed
+    // against, rolled up from its where-used units' build specs. Basis for the fit ladder AND (0.8.7)
+    // for refining the provisional fleet tag with served/category context.
+    var _normC = function (s) { return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim(); };
+    var buildBy = {}; (dataset.fleet || []).forEach(function (u) { if (u && u.build) buildBy[u.unit] = u.build; });
+    function unitDims(b) {
+      var eng = _normC((b.engine && (b.engine.make + ' ' + b.engine.model)) || '');
+      var trans = _normC((b.transmission && (b.transmission.make + ' ' + b.transmission.model)) || '');
+      var axle = {}, ratio = {};
+      (b.diffs || []).forEach(function (d) { var a = _normC((d.make || '') + ' ' + (d.model || '')); if (a) axle[a] = 1; if (d.ratio) ratio[_normC(d.ratio)] = 1; });
+      return { eng: eng, trans: trans, axle: Object.keys(axle), ratio: Object.keys(ratio) };
+    }
+    var servedBy = {};
+    mats.forEach(function (m) {
+      var eng = {}, trans = {}, axle = {}, ratio = {};
+      (m.where_used || []).forEach(function (w) {
+        var b = buildBy[w.unit]; if (!b) return; var d = unitDims(b);
+        if (d.eng) eng[d.eng] = 1; if (d.trans) trans[d.trans] = 1;
+        d.axle.forEach(function (a) { axle[a] = 1; }); d.ratio.forEach(function (r) { ratio[r] = 1; });
+      });
+      var s = { eng: Object.keys(eng), trans: Object.keys(trans), axle: Object.keys(axle), ratio: Object.keys(ratio) };
+      if (s.eng.length || s.trans.length || s.axle.length || s.ratio.length) servedBy[m.material] = s;
+    });
+    // power-unit-only systems — present on the tractor, ABSENT on trailers (no engine, no cab).
+    // A provisional TT&TL part in one of these is really TT.
+    var POWER_UNIT_CATS = { 'Engine & emissions': 1, 'Charging & starting': 1, 'Cab & body': 1 };
     function fleetOf(m) {
       var tr = false, tl = false;
       (m.where_used || []).forEach(function (w) { var t = unitType[w.unit]; if (t === 'Tractor') tr = true; else if (t === 'Trailer') tl = true; });
@@ -622,7 +648,13 @@
       if (tr) return ['TT', 'where-used'];
       if (tl) return ['TL', 'where-used'];
       var sc = m.scope || '';
-      if (sc === 'tractor-trailer') return ['TT&TL', 'scope-provisional'];
+      if (sc === 'tractor-trailer') {
+        // 0.8.7 — refine the provisional TT&TL with served/category context (deterministic, no LLM):
+        // engine/transmission evidence (served) OR a power-unit-only category ⇒ power unit ⇒ TT.
+        var sv = servedBy[m.material];
+        var powerUnit = (sv && ((sv.eng || []).length || (sv.trans || []).length)) || POWER_UNIT_CATS[m.category];
+        return powerUnit ? ['TT', 'served-config'] : ['TT&TL', 'scope-provisional'];
+      }
       if (sc === 'light-vehicle' || sc === 'greater-fleet') return ['Other', 'scope'];
       return ['Other', 'unknown'];
     }
@@ -701,31 +733,7 @@
     });
     // fleet tag per family = union of its members' fleet (data-driven; overrides the fam_verified hint when members give a signal)
     families.forEach(function (f) { var ff = famFleetUnion((f.members || []).map(function (m) { return m.material; })); if (ff !== 'Other') f.fleet = ff; });
-    // ── served config sets (0.8.6): the engine/trans/axle/ratio models a part has been
-    // consumed against, rolled up from its where-used units' build specs. This is the
-    // deterministic basis for the Viewer/app fit ladder (High=used here · Medium=served
-    // config matches this unit · Low=catalogue only · N/A=no data). Normalised so the
-    // app/viewer match unit build values the same way.
-    var _normC = function (s) { return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim(); };
-    var buildBy = {}; (dataset.fleet || []).forEach(function (u) { if (u && u.build) buildBy[u.unit] = u.build; });
-    function unitDims(b) {
-      var eng = _normC((b.engine && (b.engine.make + ' ' + b.engine.model)) || '');
-      var trans = _normC((b.transmission && (b.transmission.make + ' ' + b.transmission.model)) || '');
-      var axle = {}, ratio = {};
-      (b.diffs || []).forEach(function (d) { var a = _normC((d.make || '') + ' ' + (d.model || '')); if (a) axle[a] = 1; if (d.ratio) ratio[_normC(d.ratio)] = 1; });
-      return { eng: eng, trans: trans, axle: Object.keys(axle), ratio: Object.keys(ratio) };
-    }
-    var servedBy = {};
-    mats.forEach(function (m) {
-      var eng = {}, trans = {}, axle = {}, ratio = {};
-      (m.where_used || []).forEach(function (w) {
-        var b = buildBy[w.unit]; if (!b) return; var d = unitDims(b);
-        if (d.eng) eng[d.eng] = 1; if (d.trans) trans[d.trans] = 1;
-        d.axle.forEach(function (a) { axle[a] = 1; }); d.ratio.forEach(function (r) { ratio[r] = 1; });
-      });
-      var s = { eng: Object.keys(eng), trans: Object.keys(trans), axle: Object.keys(axle), ratio: Object.keys(ratio) };
-      if (s.eng.length || s.trans.length || s.axle.length || s.ratio.length) servedBy[m.material] = s;
-    });
+    // (servedBy computed above, before the fleet tag, so fleetOf can use served context)
     // disposition status back onto each material
     var dispBy = {};
     (dataset.duplicate_disposition || []).forEach(function (d) { dispBy[d.retire] = d.status; });
