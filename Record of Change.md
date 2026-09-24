@@ -4,6 +4,12 @@ Reverse-chronological. Each entry: what changed, why, and how to roll back. `eng
 
 ---
 
+## 2026-09-24 · viewer.html — unit cost on the part card
+
+`partView` Stock & MRP card gains a **Unit cost** row (`m.unit_cost` → `$X · SAP moving avg`, else "not
+available"), mirroring the field app. Read-only; no engine change. Rollback: drop the one `<div class="k">Unit
+cost</div>` row.
+
 ## 2026-09-24 · engine.js **0.8.8** — `materials[].unit_cost` (INV_MSTR moving/standard price)
 
 **What:** `enrich` reads the SAP unit price from the INV MSTR row — **Moving price**, else **Standard price** —

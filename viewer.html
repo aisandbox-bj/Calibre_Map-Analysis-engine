@@ -524,6 +524,7 @@ function partView(mn){
     </div></div>
     <div class="card"><div class="fh">Stock &amp; MRP</div><div class="kv">
       <div class="k">On hand</div><div class="v">${esc(m.on_hand==null?'—':nf(m.on_hand))}</div>
+      <div class="k">Unit cost</div><div class="v">${m.unit_cost>0?'<b>$'+(m.unit_cost>=100?Math.round(m.unit_cost).toLocaleString():m.unit_cost.toFixed(2))+'</b> <span style="color:var(--text-d);font-size:11px">SAP moving avg</span>':'<span style="color:var(--text-d)">not available</span>'}</div>
       <div class="k">Net consumed</div><div class="v">${esc(m.net_consumed==null?'—':nf(m.net_consumed))}</div>
       <div class="k">MRP / ROP / Max</div><div class="v">${esc(m.mrp_type||'—')} · ${m.rop==null?'—':esc(m.rop)} · ${m.max==null?'—':esc(m.max)}</div>
       <div class="k">Consuming units</div><div class="v">${esc(m.consuming_units!=null?m.consuming_units:wu.length)}</div>
