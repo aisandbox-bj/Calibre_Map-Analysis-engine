@@ -202,6 +202,7 @@ function deriveHome(){
   M.innerHTML = `
   <h2 style="color:var(--map)">Load the feedstock</h2>
   <div class="group-label">SAP downloads <span>Raw extracts pulled straight from SAP each refresh cycle.</span></div>
+  <div class="note" style="border-left:3px solid var(--warn);padding-left:10px;margin-bottom:14px"><b>Inspection &amp; what-if tool.</b> Production datasets (the ones the field app and the Viewer ship with) are built only by <code>refresh.js</code>, which adds the register, identity traces, bins, unit cost, build specs, the assessment overlay and the field records this browser engine does not. Its export is a <b>working copy</b> — don't ship it.</div>
   <div class="upload-grid">
     ${drop('mb51','MB51','',true,'.xlsx,.xls','Material movements · Posting Date, Order, Material, Movement Type, Quantity. Movements 261 / 262, ≥ 12 months.','drag .xlsx / .xls here, or click')}
     ${drop('iw39','IW39','',true,'.xlsx,.xls','Work-order list · Order → Sort Field. Maps each order to its consuming unit.','drag .xlsx / .xls here, or click')}
@@ -215,7 +216,7 @@ function deriveHome(){
   <div class="group-label">Campaign inputs <span>Curated identity, field verification, and QA artifacts — not from SAP.</span></div>
   <div class="upload-grid">
     ${drop('master','Traced register','optional',false,'.csv,.xlsx,.xls','Curated identity master · description, brand, duplicate group (Group label).','drag .csv / .xlsx here, or click')}
-    ${drop('captures','Field captures','optional · multiple',false,'.json','Exported materialid_bundle_*.json from the field app · verdicts (SAME / SPLIT / ALL-DIFFERENT), keep / retire.','drag .json files here, or click',true)}
+    ${drop('captures','Field captures','optional · multiple',false,'.json','Exported CalibreMap_capture_*.json (or legacy materialid_bundle_*.json) from the field app · verdicts (SAME / SPLIT / ALL-DIFFERENT), keep / retire.','drag .json files here, or click',true)}
     ${drop('gold','Golden CSV','optional · self-check',false,'.csv','consumption_by_unit.csv · validation only. Checks the derivation is exact — never enters the dataset.','drag .csv here, or click')}
   </div>
   <div class="btnrow"><button class="primary" id="run" disabled>Run derivation</button></div>
@@ -379,7 +380,7 @@ function scoreboardScreen(){
       </div>
       <div class="bar">${seg(SB.eliminated!=null?SB.eliminated:0,'var(--text-d)')}${seg(k.runningDown,'var(--ok)')}${seg(k.reorderRisk,'var(--crit)')}</div>
       <div class="note">${(k.onHandInRetire||0).toLocaleString()} units on-hand tied in retired numbers${k.provisionalFamilies?` · ${k.provisionalFamilies} family(ies) “no technical preference”`:''}. Needs INV MSTR for on-hand accuracy.</div></div>`;
-  } else html+=`<div class="card"><div class="fh">Removal scoreboard</div><div class="note">No disposition yet — load field captures (materialid_bundle_*.json) in Step 1 to populate verdicts and the scoreboard.</div></div>`;
+  } else html+=`<div class="card"><div class="fh">Removal scoreboard</div><div class="note">No disposition yet — load field captures (CalibreMap_capture_*.json) in Step 1 to populate verdicts and the scoreboard.</div></div>`;
   if(VERIF){ html+=`<div class="card"><div class="fh" style="color:var(--verify-t)">Verification merge</div>
     <div class="kpis"><div class="kpi ok"><div class="n">${VERIF.families}</div><div class="l">families field-verified</div></div>
       <div class="kpi"><div class="n">${VERIF.verdicts.SAME}</div><div class="l">SAME</div></div>
@@ -416,8 +417,9 @@ function datasetScreen(){
   $('#export').addEventListener('click',()=>{
     const blob=new Blob([JSON.stringify(DERIVED,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob); const a=document.createElement('a');
-    a.href=url; a.download='calibre_map_dataset_'+(new Date().toISOString().slice(0,10))+'.json'; a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),2000); toast('Exported canonical JSON');
+    // a WORKING COPY, named so it can never be mistaken for the production dataset
+    a.href=url; a.download='CalibreMap_workingcopy_'+(new Date().toISOString().slice(0,10))+'.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000); toast('Exported working copy (not the production dataset)');
   });
 }
 

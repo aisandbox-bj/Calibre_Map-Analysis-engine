@@ -215,6 +215,30 @@ h3{font-family:var(--f-head);font-size:14px;margin:16px 0 8px;color:var(--text-m
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--chrome);border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:13px;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
 .hidden{display:none}
+/* field photos (OneDrive-folder pack: window.__CALIBRE_PHOTOS__ + a photos/ folder; absent in the single-file bundle) */
+.pgal{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 14px}
+.pfig{margin:0;width:120px}
+.pfig img{width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;display:block;background:#000}
+.pfig figcaption{font-size:10.5px;color:var(--text-d);margin-top:3px;font-family:var(--f-mono);word-break:break-word;line-height:1.25}
+.plbox{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:2000;cursor:zoom-out}
+.plbox.on{display:flex}
+.plbox img{max-width:94vw;max-height:94vh;border-radius:8px}
+/* dataset-identity strip (what JSON is loaded: type / client / date / counts) */
+.dsinfo{display:flex;flex-wrap:wrap;gap:8px;margin:-2px 0 18px}
+.dschip{font-family:var(--f-mono);font-size:11px;color:var(--text-m);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 11px;white-space:nowrap}
+.dschip i{color:var(--text-d);font-style:normal;margin-right:6px;text-transform:uppercase;letter-spacing:.04em}
+/* field records (0.9.0 canonical field_equipment / sap_flags / field_sources) */
+.frow{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-top:1px solid var(--border);font-size:13px}
+.frow:first-of-type{border-top:0}
+.frow .fk{font-family:var(--f-mono);font-size:11px;color:var(--text-d);text-transform:uppercase;letter-spacing:.04em;width:110px;flex:none}
+.frow .fv{flex:1;min-width:0}
+.frow .fwho{font-family:var(--f-mono);font-size:10.5px;color:var(--text-d);white-space:nowrap}
+.flagcard{border-left:3px solid var(--crit)}
+.srct{width:100%;border-collapse:collapse;font-size:12px}
+.srct th,.srct td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.srct th{color:var(--text-d);font-weight:600;font-family:var(--f-mono);font-size:10.5px;text-transform:uppercase}
+.srct .num{text-align:right;font-variant-numeric:tabular-nums}
+.srct .mono{font-family:var(--f-mono);font-size:11px}
 </style>
 </head>
 <body>
@@ -329,8 +353,28 @@ function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('sh
 function pick(){ $('#file').click(); }
 $('#file').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f); e.target.value=''; });
 function readFile(f){ const r=new FileReader(); r.onload=()=>{ try{ ingest(JSON.parse(r.result), f.name); }catch(err){ alert('Could not parse JSON: '+err.message); } }; r.readAsText(f); }
+/* A loaded JSON declares what it is. App-output (field capture) bundles aren't datasets —
+   show their details instead of trying to render them as parts. */
+function captureInfoView(d, name){
+  DATA=null; NAV=[]; here('home', goHome); $('#backbtn').style.display='none'; $('#saveInd').textContent='';
+  crumb('Capture bundle');
+  const nPhotos=(d.photos||[]).length, nCap=Object.keys(d.captures||{}).length,
+        nEquip=Object.keys(d.equip||{}).length, nFlags=Object.keys(d.sapFlags||{}).length;
+  const row=(k,v)=>`<div class="k">${esc(k)}</div><div class="v">${esc(v==null||v===''?'—':String(v))}</div>`;
+  M.innerHTML = `
+  <div class="hero"><div class="eyebrow-mono">FIELD CAPTURE · app output</div>
+    <div class="pn">${esc(name||'capture bundle')}</div></div>
+  <div class="factgrid"><div class="card"><div class="fh">Bundle details</div><div class="kv">
+    ${row('Client', d.client)}${row('Device', d.device)}${row('Operator', d.tech)}
+    ${row('Exported', d.exported? new Date(d.exported).toLocaleString() : '')}${row('Build date', d.built)}
+    ${row('Captures', nCap)}${row('Equipment units', nEquip)}${row('SAP flags', nFlags)}${row('Photos', nPhotos)}
+  </div></div></div>
+  <div class="note">This is a <b>field capture</b> file (app output). Fold it into the dataset with the analyst refresh, then load the resulting <b>viewer</b> dataset here to browse parts. It isn't a dataset itself, so there's nothing to navigate.</div>
+  <button class="primary core" onclick="pick()">⤒ Load a viewer dataset instead</button>`;
+}
 function ingest(d, name, opts){
   opts=opts||{};
+  if(d && d.type==='capture' && (d.captures || d.photos || d.equip)){ captureInfoView(d, name); return; }
   DATA=d;
   DUPINDEX={}; FAMBYMAT={}; UNITINDEX={}; MATBYMN={}; FLEETBYUNIT={}; CATINDEX={};
   (d.materials||[]).forEach(x=>{
@@ -357,7 +401,9 @@ function exportJson(){
   if(!DATA) return;
   const blob=new Blob([JSON.stringify(DATA)],{type:'application/json'});
   const url=URL.createObjectURL(blob); const a=document.createElement('a');
-  a.href=url; a.download='calibre_map_dataset_'+(new Date().toISOString().slice(0,10))+'.json'; a.click();
+  // naming convention: CalibreMap_viewer_<client>_<date>.json (viewer input)
+  const cl=String(((DATA.meta||{}).clientCode)||'CLIENT').replace(/[^A-Za-z0-9-]/g,'');
+  a.href=url; a.download='CalibreMap_viewer_'+cl+'_'+(new Date().toISOString().slice(0,10))+'.json'; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
@@ -367,6 +413,25 @@ function here(id, fn){ NAV.push({id, fn}); $('#backbtn').style.display = NAV.len
 function goBack(){ if(NAV.length<=1){ goHome(); return; } NAV.pop(); const prev=NAV[NAV.length-1]; NAV.pop(); prev.fn(); }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && NAV.length>1) goBack(); });
 
+/* what dataset is loaded — surfaced as a chip strip on Home */
+function datasetInfo(){
+  if(!DATA) return '';
+  const PM=window.__CALIBRE_META__||{}, meta=DATA.meta||{};
+  const type = PM.type || (DATA.type) || 'viewer dataset';
+  const client = PM.client || meta.clientCode || meta.client || DATA.client || '—';
+  const date = PM.built || meta.built || meta.asOf || meta.generatedAt || DATA.built || '';
+  const P=window.__CALIBRE_PHOTOS__;
+  const photoCards = P ? (Object.keys(P.byMat||{}).length + Object.keys(P.byUnit||{}).length) : 0;
+  const parts=(DATA.materials||[]).length, fams=(DATA.families||[]).length, units=Object.keys(UNITINDEX).length;
+  const chips=[['Type',type],['Client',client]];
+  if(date) chips.push(['Date',String(date).slice(0,10)]);
+  chips.push(['Parts',nf(parts)],['Families',nf(fams)],['Units',nf(units)]);
+  if(photoCards) chips.push(['Field photos', photoCards+' card'+(photoCards>1?'s':'')]);
+  const fr=Object.keys(DATA.field_equipment||{}).length, sf=(DATA.sap_flags||[]).length;
+  if(fr) chips.push(['Field records', fr+' unit'+(fr>1?'s':'')]);
+  if(sf) chips.push(['SAP flags', nf(sf)]);
+  return '<div class="dsinfo">'+chips.map(c=>'<span class="dschip"><i>'+esc(c[0])+'</i>'+esc(String(c[1]))+'</span>').join('')+'</div>';
+}
 /* ── HOME ── */
 function goHome(){
   NAV=[]; here('home', goHome);
@@ -380,6 +445,7 @@ function goHome(){
   const needs=(c.needsIdentification!=null?c.needsIdentification:(DATA.needs_identification||[]).length);
   M.innerHTML = `
   <h2>How can I help navigate you today?</h2>
+  ${datasetInfo()}
   <div class="modes">
     <div class="modecard mc-map" onclick="mapHome()"><div class="glow"></div>
       <div class="eyebrow">Mode 1</div><div class="name">Parts Mapping</div>
@@ -501,6 +567,56 @@ function partRow(m, fitB){
       </div>
     </div><span class="chev">${IC.chev}</span></div>`;
 }
+/* ── field photos: shown when the viewer runs as a OneDrive-folder pack (window.__CALIBRE_PHOTOS__
+   set by data.js + a sibling photos/ folder). In the single-file bundle this global is absent, so
+   every helper returns [] and nothing renders — no change to the classic viewer. ── */
+function cmPhotoDir(){ var P=window.__CALIBRE_PHOTOS__; return (P&&P.dir)||'photos/'; }
+function cmMatPhotos(mn){ var P=window.__CALIBRE_PHOTOS__; return (P&&P.byMat&&P.byMat[String(mn)])||[]; }
+function cmUnitPhotos(uid){ var P=window.__CALIBRE_PHOTOS__; return (P&&P.byUnit&&P.byUnit[uid])||[]; }
+function cmFamPhotos(fid){ var P=window.__CALIBRE_PHOTOS__; return (P&&P.byFam&&P.byFam[fid])||[]; }
+function famPhotoStrip(fid){
+  var l=cmFamPhotos(fid); if(!l.length) return '';
+  var dir=cmPhotoDir();
+  return '<div class="pgal" style="margin:8px 0 0;gap:6px">'+l.slice(0,6).map(function(x){ var f=(typeof x==='string')?x:x.f;
+    return '<img loading="lazy" src="'+dir+f+'" onclick="event.stopPropagation();lightbox(this.src)" style="width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:zoom-in">'; }).join('')+
+    (l.length>6?'<span class="muted" style="align-self:center;font-size:11px">+'+(l.length-6)+'</span>':'')+'</div>';
+}
+/* ── field records (canonical field_equipment / sap_flags, folded from reviewed capture bundles) ── */
+function fieldWho(x){ x=x||{}; return [x.tech,x.device].filter(Boolean).join(' · ')+(x.ts?' · '+String(x.ts).slice(0,10):''); }
+function renderFieldRecords(uid){
+  const r=(DATA.field_equipment||{})[uid]; if(!r) return '';
+  const LBL={engine:'Engine',trans:'Transmission',cab:'Cab',chassis:'Chassis'};
+  const lab=k=>LBL[k]||(/^diff(\d+)$/.test(k)?'Diff '+k.slice(4):k);
+  const spec=DATA.equipSpec||{};
+  const flab=k=>{ const p=k.split('.'), sec=spec[p[0]], fd=sec&&(sec.fields||[]).find(x=>x.k===p[1]); return fd?fd.label:k; };
+  const conf=Object.keys(r.bok||{});
+  const rows=[];
+  if(conf.length) rows.push(`<div class="frow"><span class="fk">Confirmed</span><span class="fv">${conf.map(k=>esc(lab(k))).join(' · ')}</span><span class="fwho">${esc(fieldWho(r.bok[conf[0]]))}</span></div>`);
+  Object.keys(r.comp||{}).forEach(k=>{ const c=r.comp[k];
+    rows.push(`<div class="frow"><span class="fk">${esc(lab(k))}</span><span class="fv">${c.sn?'S/N <b>'+esc(c.sn)+'</b>':''}${c.sn&&c.note?' · ':''}${esc(c.note||'')}</span><span class="fwho">${esc(fieldWho(c))}</span></div>`); });
+  (r.acc||[]).forEach(a=>rows.push(`<div class="frow"><span class="fk">Accessory</span><span class="fv"><b>${esc(a.name||'accessory')}</b>${a.desc?' — '+esc(a.desc):''}${a.sn?' · S/N '+esc(a.sn):''}${a.note?' · '+esc(a.note):''}</span><span class="fwho">${esc(fieldWho(a))}</span></div>`));
+  Object.keys(r.fields||{}).forEach(k=>{ const f=r.fields[k];
+    rows.push(`<div class="frow"><span class="fk">${esc(flab(k))}</span><span class="fv">${esc(f.v)}</span><span class="fwho">${esc(fieldWho(f))}</span></div>`); });
+  if(!rows.length) return '';
+  return `<div class="cfgcard"><div class="cardh">Recorded in the field</div><div class="cardsub">Captured on the tablets at the unit — confirmed build items, serials, notes, non-listed accessories and spec answers.</div>${rows.join('')}</div>`;
+}
+function sapFlagCard(mn){
+  const fl=(DATA.sap_flags||[]).filter(f=>String(f.material)===String(mn)); if(!fl.length) return '';
+  return `<div class="card flagcard" style="margin-bottom:12px"><div class="fh" style="color:var(--crit)">SAP data issue flagged in the field — ${fl.length}</div>`+
+    fl.map(f=>`<div class="frow"><span class="fv">${(f.tags||[]).map(t=>'<span class="pillv">'+esc(t)+'</span>').join(' ')} ${esc(f.note||'')}${f.photos?' · '+f.photos+' photo'+(f.photos>1?'s':''):''}</span><span class="fwho">${esc(fieldWho(f))}</span></div>`).join('')+`</div>`;
+}
+function photoGallery(list, title){
+  if(!list||!list.length) return '';
+  var dir=cmPhotoDir();
+  return '<h3 style="color:var(--map)">'+esc(title)+' <span style="font-size:12px;color:var(--text-d)">'+list.length+' field photo'+(list.length>1?'s':'')+'</span></h3>'+
+    '<div class="pgal">'+list.map(function(x){ var f=(typeof x==='string')?x:x.f; var cap=(x&&x.k)?x.k:'';
+      return '<figure class="pfig"><img loading="lazy" src="'+dir+f+'" onclick="lightbox(this.src)">'+(cap?'<figcaption>'+esc(cap)+'</figcaption>':'')+'</figure>'; }).join('')+'</div>';
+}
+function lightbox(src){
+  var b=document.getElementById('plbox');
+  if(!b){ b=document.createElement('div'); b.id='plbox'; b.className='plbox'; b.onclick=function(){ b.classList.remove('on'); }; b.innerHTML='<img>'; document.body.appendChild(b); }
+  b.querySelector('img').src=src; b.classList.add('on');
+}
 function partView(mn){
   const m=MATBYMN[String(mn)]; if(!m) return;
   crumb('Part · '+(m.pn||mn)); here('part:'+mn, ()=>partView(mn));
@@ -520,6 +636,8 @@ function partView(mn){
       <div class="k">Description</div><div class="v">${esc(m.description||'—')}</div>
       ${m.crosses?`<div class="k">Cross-refs</div><div class="v" style="font-family:var(--f-mono);font-size:12px">${esc(m.crosses)}</div>`:''}
       ${m.fits?`<div class="k">Identity / fits</div><div class="v">${esc(m.fits)}</div>`:''}
+      <div class="k">Fleet</div><div class="v">${esc(m.fleet||'—')}${m.fleet_basis?` <span style="color:var(--text-d);font-size:11px">${esc(m.fleet_basis)}</span>`:''}</div>
+      ${m.identity_source==='assessment'?`<div class="k">Identity source</div><div class="v" style="color:var(--text-m)">web assessment (High confidence)</div>`:''}
       <div class="k">Status</div><div class="v">${m.identified===false?'<span style="color:var(--warn)">not in master — needs identification</span>':(m.moved===false?'<span style="color:var(--text-m)">known part · never issued on a fleet work order</span>':'in material master')}</div>
     </div></div>
     <div class="card"><div class="fh">Stock &amp; MRP</div><div class="kv">
@@ -532,6 +650,8 @@ function partView(mn){
       <div class="k">Dup group</div><div class="v">${esc(m.duplicate_group||'—')}</div>
     </div></div>
   </div>
+  ${sapFlagCard(mn)}
+  ${photoGallery(cmMatPhotos(mn), 'Field photos')}
   <h3 style="color:var(--map)">Potential duplicates</h3>
   ${dupPanel(m)}
   <h3 style="color:var(--map)">Where used &amp; likely fit</h3>
@@ -670,6 +790,8 @@ function unitView(uid){
     <div class="pn">${esc(uid)} <span style="color:var(--map);font-weight:600;font-size:.62em">— ${esc([u.make,u.model].filter(Boolean).join(' ')||'not in fleet register')}</span></div></div>
   ${renderUnitBuild(u)}
   ${renderUnitConfig(u)}
+  ${renderFieldRecords(uid)}
+  ${photoGallery(cmUnitPhotos(uid), 'Field photos')}
   <h3 style="color:var(--map)">Pick a system</h3>
   <div class="tiles">${zoneTiles}</div>
   ${nc?`<div class="tile consumed" onclick="unitConsumed('${esc(uid)}')" style="margin-bottom:14px">
@@ -772,7 +894,7 @@ function dupHome(){
       : `<div class="memb" data-mn="${esc(mm.material)}"><span class="mnm">${esc(mm.material)}</span><span class="${mm.keep?'keep':'ret'}">${mm.keep?'KEEP':'retire'} · pile ${esc(mm.pile)}</span></div>`).join('');
     const partLine=(cat&&f.part)?`<div class="note" style="color:var(--text-m)">${esc(f.part)}</div>`:'';
     const note=`<div class="note">${f.tech?('by '+esc(f.tech)+' · '):''}${(f.ts&&!cat)?esc(String(f.ts).slice(0,10)):''}${f.site_answer?((cat?'':' · ')+'“'+esc(f.site_answer)+'”'):''}${(cat&&f.site_q)?' · <span style="color:var(--warn)">Site Q: '+esc(f.site_q)+'</span>':''}</div>`;
-    return `<div class="fam${cat?' cand':''}" data-fid="${esc(f.family_id)}">${head}${partLine}${mems}${note}</div>`;
+    return `<div class="fam${cat?' cand':''}" data-fid="${esc(f.family_id)}">${head}${partLine}${mems}${note}${famPhotoStrip(f.family_id)}</div>`;
   };
   const nField=fams.filter(f=>f.source!=='catalogue').length;
   const famHtml = fams.length
@@ -808,6 +930,14 @@ function fleetHome(){
 }
 
 /* ═══ MODE 4 · DATA & SETTINGS ═══ */
+// every input file the engine built this dataset from, labelled (so a dataset explains itself)
+function srcList(sf){
+  const L={drop:'SAP drop',iw39:'IW39 work orders',mb51:'MB51 movements',invMstr:'INV_MSTR stock',register:'Register',traces:'Web traces',bins:'Bin locations',assessment:'Assessment export',captures:'Field captures'};
+  const rows=Object.keys(sf).filter(k=>sf[k]&&(!Array.isArray(sf[k])||sf[k].length)).map(k=>{
+    const v=Array.isArray(sf[k])?sf[k].map(esc).join('<br>'):esc(sf[k]);
+    return `<span style="color:var(--text-d)">${esc(L[k]||k)}</span><br>${v}`; });
+  return rows.join('<br><br>')||'—';
+}
 function dataHome(){
   crumb('Data & Settings'); here('data', dataHome);
   const m=DATA.meta||{}, c=DATA.counts||{}, sb=DATA.scoreboard||null;
@@ -833,9 +963,15 @@ function dataHome(){
     <div class="k">Generated</div><div class="v">${esc(m.generatedAt||'—')}</div>
     <div class="k">Engine phase</div><div class="v">${esc(m.phase||'—')}</div>
     <div class="k">Counts</div><div class="v">${nf(c.materials||0)} parts · ${nf(c.families||0)} families · ${nf(c.dispositions||0)} dispositions · ${nf(c.needsIdentification||0)} need ID</div>
-    <div class="k">Sources</div><div class="v" style="font-family:var(--f-mono);font-size:11.5px">${Object.values(m.sourceFiles||{}).filter(Boolean).map(esc).join('<br>')||'—'}</div>
+    <div class="k">Engine</div><div class="v">${esc(m.engineVersion||'—')}${m.drop?' · drop '+esc(m.drop):''}</div>
+    <div class="k">Built from</div><div class="v" style="font-family:var(--f-mono);font-size:11.5px">${srcList(m.sourceFiles||{})}</div>
+    ${m.assessment?`<div class="k">Assessment</div><div class="v">${esc(m.assessment.source||'')}<br><span style="color:var(--text-m)">${nf(m.assessment.rows)} web identities · ${nf(m.assessment.category)} categories upgraded · ${nf(m.assessment.brand)} brands + ${nf(m.assessment.oem_pn)} OEM PNs filled</span></div>`:''}
     <div class="k">Storage</div><div class="v">${esc($('#saveInd').textContent||'not saved')} — kept in this browser (IndexedDB)</div>
   </div></div>
+  ${(DATA.field_sources||[]).length?`<div class="card" style="margin-bottom:12px"><div class="fh" style="color:var(--core)">Field capture files folded in — ${DATA.field_sources.length}</div>
+    <div style="overflow-x:auto"><table class="srct"><thead><tr><th>File</th><th>Device</th><th>Operator</th><th>Exported</th><th class="num">Captures</th><th class="num">Equip</th><th class="num">Flags</th><th class="num">Photos</th></tr></thead><tbody>
+    ${DATA.field_sources.map(s=>`<tr><td class="mono">${esc(s.file||'—')}</td><td>${esc(s.device||'—')}</td><td>${esc(s.tech||'—')}</td><td>${esc(String(s.exported||'').slice(0,16).replace('T',' '))}</td><td class="num">${nf(s.captures||0)}</td><td class="num">${nf(s.equipItems||0)}</td><td class="num">${nf(s.sapFlags||0)}</td><td class="num">${nf(s.photos||0)}</td></tr>`).join('')}
+    </tbody></table></div></div>`:''}
   <div class="btnrow">
     <button class="primary core" onclick="pick()">⤒ Load / swap dataset</button>
     <button class="ghost" onclick="exportJson()">⤓ Export JSON</button>

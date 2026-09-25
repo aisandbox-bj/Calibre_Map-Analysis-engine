@@ -471,6 +471,17 @@
   // Reads an equipment register (fleet_register_enriched.csv shape) into the
   // canonical fleet[] the viewer/app drill on: unit → type/make/model/year/engine.
   // Additive; the deterministic consumption/enrichment outputs are unaffected.
+  // 0.9.0: FIRST BUILD with no fleet register yet — the units still exist in the work-order history.
+  // Emit one bare record per consuming unit (type/make/model blank = unknown) so Equipment
+  // Verification has a unit list and field capture can start; the analyst's fleet register
+  // replaces these on a later refresh. Only used when no register rows were supplied.
+  function fleetFromWhereUsed(materials) {
+    var seen = {};
+    (materials || []).forEach(function (m) { (m.where_used || []).forEach(function (w) { if (w && w.unit) seen[w.unit] = 1; }); });
+    return Object.keys(seen).sort().map(function (u) {
+      return { unit: u, type: '', make: '', model: '', year: '', engine: '', floc: '', source: 'where-used' };
+    });
+  }
   function buildFleet(rows) {
     var out = [], seen = {};
     (rows || []).forEach(function (r) {
@@ -492,9 +503,14 @@
   // A field capture sorts a duplicate family's members into piles (g: mn->pile).
   // Verdict is derived: one pile = SAME (merge), one pile per member = ALL_DIFFERENT,
   // anything between = SPLIT (partial merge).
-  function verdictFromPiles(g) {
-    var mns = Object.keys(g || {}), piles = {};
-    mns.forEach(function (mn) { var p = String(g[mn]); (piles[p] = piles[p] || []).push(mn); });
+  // 0.9.0: matches the field app exactly (app_template famPiles) — a member marked 'nf'
+  // (not found on the shelf) or reclassified out of the family (cap.moved) is NOT a pile
+  // and does not count toward the verdict. Previously 'nf' counted as its own pile, so the
+  // engine could report SPLIT where the technician certified SAME.
+  function verdictFromPiles(g, moved) {
+    var mns = Object.keys(g || {}).filter(function (mn) { return String(g[mn]) !== 'nf' && !(moved && moved[mn]); });
+    var piles = {};
+    mns.forEach(function (mn) { var p = String(g[mn]); if (!p) return; (piles[p] = piles[p] || []).push(mn); });
     var np = Object.keys(piles).length;
     var verdict = np <= 1 ? 'SAME' : (np === mns.length ? 'ALL_DIFFERENT' : 'SPLIT');
     return { verdict: verdict, piles: piles, members: mns.length };
@@ -523,7 +539,7 @@
           notes: c.mnotes || {}, qoh: c.qoh || {}
         };
         if (c.g) {
-          var v = verdictFromPiles(c.g);
+          var v = verdictFromPiles(c.g, c.moved);
           rec.verdict = v.verdict; rec.piles = v.piles; rec.members = v.members;
           rec.keep = c.keep || {}; rec.provisional = !!c.keepProvisional;
           rec.retire = [];   // in-stock members not chosen as keep within their pile
@@ -542,7 +558,87 @@
         dataset.verification.push(rec);
       });
     });
+    dedupeVerification(dataset);
     return sum;
+  }
+
+  // 0.9.0: one record per capture key — the LATEST (by ts) wins. refresh carries the previous
+  // verification[] forward and re-merges bundles, so without this every refresh duplicated rows
+  // and the removal scoreboard double-counted. Idempotent; safe to call on already-clean data.
+  function dedupeVerification(dataset) {
+    var best = {}, order = [];
+    (dataset.verification || []).forEach(function (r) {
+      var k = r.key || (r.stage + ':' + r.family_id);
+      if (!best[k]) { order.push(k); best[k] = r; return; }
+      if (String(r.ts || '') >= String(best[k].ts || '')) best[k] = r;
+    });
+    var before = (dataset.verification || []).length;
+    dataset.verification = order.map(function (k) { return best[k]; });
+    return before - dataset.verification.length;
+  }
+
+  // 0.9.0: fold the NON-verdict field capture into the canonical, so what a technician records
+  // at the machine reaches the planner (viewer) and the other tablets (app):
+  //   field_equipment[uid] — component serial/note (comp), non-listed accessories (acc), the
+  //                          equipment-verification answers (fields) and confirmed build items (bok)
+  //   sap_flags[]          — per-material SAP data-issue flags (tags + note)
+  //   field_sources[]      — provenance: which bundle (client/device/operator/time) contributed what
+  // Latest write wins per unit-component / accessory id / flag id. Photos stay OUT of the canonical
+  // (binary) — the viewer pack externalises them; photo ids are keyed the same way.
+  function mergeFieldCapture(dataset, bundles) {
+    var eq = {}, flags = {}, srcs = (dataset.field_sources || []).slice();
+    Object.keys(dataset.field_equipment || {}).forEach(function (uid) {   // carried-forward shape: acc[] → map by id
+      var p = dataset.field_equipment[uid] || {}, am = {};
+      (Array.isArray(p.acc) ? p.acc : Object.keys(p.acc || {}).map(function (k) { return p.acc[k]; })).forEach(function (a) { if (a && a.id) am[a.id] = a; });
+      eq[uid] = { comp: Object.assign({}, p.comp || {}), acc: am, fields: Object.assign({}, p.fields || {}), bok: Object.assign({}, p.bok || {}) };
+    });
+    (dataset.sap_flags || []).forEach(function (f) { flags[f.material + '|' + f.id] = f; });
+    var list = Array.isArray(bundles) ? bundles : [bundles];
+    list.forEach(function (b) {
+      if (!b) return;
+      var who = { tech: b.tech || '', device: b.device || '', client: b.client || '', ts: b.exported || '' };
+      var nEq = 0, nFlag = 0;
+      Object.keys(b.equip || {}).forEach(function (uid) {
+        var r = b.equip[uid] || {}, u = eq[uid] || (eq[uid] = { comp: {}, acc: {}, fields: {}, bok: {} });
+        var ts = r._ts || who.ts;
+        Object.keys(r.comp || {}).forEach(function (k) {
+          var c = r.comp[k] || {}; if (!((c.sn || '').trim() || (c.note || '').trim())) return;
+          var cur = u.comp[k]; if (cur && String(cur.ts || '') > String(ts || '')) return;
+          u.comp[k] = { sn: c.sn || '', note: c.note || '', tech: who.tech, device: who.device, ts: ts }; nEq++;
+        });
+        (r.acc || []).forEach(function (a) {
+          if (!a || !a.id || !((a.name || '').trim() || (a.desc || '').trim())) return;
+          var cur = u.acc[a.id]; if (cur && String(cur.ts || '') > String(ts || '')) return;
+          u.acc[a.id] = { id: a.id, name: a.name || '', desc: a.desc || '', sn: a.sn || '', note: a.note || '', tech: who.tech, device: who.device, ts: ts }; nEq++;
+        });
+        Object.keys(r).forEach(function (k) {
+          if (k.indexOf('.') > 0 && typeof r[k] === 'string' && r[k]) { u.fields[k] = { v: r[k], tech: who.tech, device: who.device, ts: ts }; nEq++; }
+        });
+        Object.keys(r.bok || {}).forEach(function (k) { if (r.bok[k]) { u.bok[k] = { tech: who.tech, device: who.device, ts: ts }; nEq++; } });
+      });
+      Object.keys(b.sapFlags || {}).forEach(function (mnk) {
+        (b.sapFlags[mnk] || []).forEach(function (f) {
+          if (!f) return; var id = f.id || f.ts || '';
+          flags[mnk + '|' + id] = { material: String(mnk), id: id, tags: f.tags || [], note: f.note || '', photos: f.nph || 0, tech: f.tech || who.tech, device: who.device, ts: f.ts || who.ts };
+          nFlag++;
+        });
+      });
+      srcs.push({ file: b._file || '', client: who.client, device: who.device, tech: who.tech, exported: who.ts,
+        captures: Object.keys(b.captures || {}).length, equipItems: nEq, sapFlags: nFlag, photos: (b.photos || []).length });
+    });
+    // flatten accessories to arrays; drop empty units
+    var out = {};
+    Object.keys(eq).forEach(function (uid) {
+      var u = eq[uid], acc = Object.keys(u.acc || {}).map(function (k) { return u.acc[k]; });
+      if (!Object.keys(u.comp || {}).length && !acc.length && !Object.keys(u.fields || {}).length && !Object.keys(u.bok || {}).length) return;
+      out[uid] = { comp: u.comp || {}, acc: acc, fields: u.fields || {}, bok: u.bok || {} };
+    });
+    // de-dupe sources by file+exported (a bundle folded twice is still one source)
+    var seen = {}; srcs = srcs.filter(function (s) { var k = s.file + '|' + s.exported + '|' + s.device; return seen[k] ? false : (seen[k] = 1, true); });
+    dataset.field_equipment = out;
+    dataset.sap_flags = Object.keys(flags).map(function (k) { return flags[k]; });
+    dataset.field_sources = srcs;
+    return { units: Object.keys(out).length, sapFlags: dataset.sap_flags.length, sources: srcs.length };
   }
 
   // ── Phase 4: removal scoreboard (duplicate_disposition) ──────────
@@ -583,25 +679,41 @@
   // > SAP-desc audit. Rows: [{material, category, category_confidence[, category_reason]}]
   // or the harness export shape [{material, identity:{category, confidence}}].
   var CONF_RANK = { high: 3, med: 2, medium: 2, low: 1, none: 0, '': 0 };
+  // 0.9.0 guards: an assessment only upgrades — it never downgrades. Rows with no real category
+  // ('Unclassified'/blank) or LOW/none confidence are ignored (the harness emits ~1.5k such rows;
+  // applied naively they would overwrite the engine's own SAP-desc classification with
+  // "Unclassified"). A HIGH-confidence identity also fills a BLANK brand / OEM part number
+  // (never overwrites a register/trace value), tagged identity_source:'assessment'.
+  // Accepts [{material, category, category_confidence}] or the harness export rows
+  // [{material, identity:{category, confidence, oem, part_no}}]. Returns a change summary.
   function applyAssessment(materials, rows) {
-    if (!rows || !rows.length) return materials;
+    var sum = { rows: (rows || []).length, eligible: 0, category: 0, brand: 0, oem_pn: 0 };
+    if (!rows || !rows.length) return sum;
     var byMat = {};
     rows.forEach(function (r) { var mn = s(r.material || r.Material); if (mn) byMat[mn] = r; });
     (materials || []).forEach(function (m) {
       var a = byMat[s(m.material)]; if (!a) return;
-      if (m.category_reason === 'analyst-confirmed') return;          // manual correction wins
-      var acat = a.category != null && a.category !== '' ? a.category : (a.identity && a.identity.category);
-      if (!acat) return;
-      var aconf = String(a.category_confidence || (a.identity && a.identity.confidence) || '').toLowerCase();
+      var id = a.identity || {};
+      var acat = a.category != null && a.category !== '' ? a.category : id.category;
+      var aconf = String(a.category_confidence || id.confidence || '').toLowerCase();
       if (aconf === 'medium') aconf = 'med';
-      var base = String(m.category_confidence || 'none').toLowerCase();
-      if ((CONF_RANK[aconf] || 0) >= (CONF_RANK[base] || 0) || base === 'none' || base === 'low') {
-        m.category = acat;
-        m.category_confidence = aconf || m.category_confidence;
-        m.category_reason = a.category_reason || 'assessment overlay';
+      if ((CONF_RANK[aconf] || 0) < 2) return;                                  // High/Med only
+      sum.eligible++;
+      if (acat && !/^unclassified$/i.test(acat) && m.category_reason !== 'analyst-confirmed') {   // manual correction wins
+        var base = String(m.category_confidence || 'none').toLowerCase();
+        if ((CONF_RANK[aconf] || 0) >= (CONF_RANK[base] || 0) || base === 'none' || base === 'low') {
+          if (m.category !== acat) sum.category++;
+          m.category = acat;
+          m.category_confidence = aconf;
+          m.category_reason = a.category_reason || 'assessment overlay';
+        }
+      }
+      if (aconf === 'high') {
+        if (!m.brand && id.oem) { m.brand = id.oem; m.identity_source = 'assessment'; sum.brand++; }
+        if (!m.oem_pn && id.part_no) { m.oem_pn = id.part_no; m.identity_source = 'assessment'; sum.oem_pn++; }
       }
     });
-    return materials;
+    return sum;
   }
 
   // ── Phase 5: assemble the one canonical dataset (the shared contract) ──
@@ -609,8 +721,10 @@
   // emits, build_app.py packages, and the desktop viewer reads. Pure assembly.
   // 1.1.0 (2026-09-21, additive): materials may carry brand/oem_pn/crosses/
   // duplicate_family/scope/moved; fleet[] may carry spec{v,h}; top-level equipSpec.
-  var SCHEMA_VERSION = '1.1.0';
-  var ENGINE_VERSION = '0.8.8';
+  // 1.2.0 (2026-09-24, additive): field_equipment{}, sap_flags[], field_sources[]; materials may carry
+  // identity_source; meta.assessment {source, rows, eligible, category, brand, oem_pn}; meta.drop.
+  var SCHEMA_VERSION = '1.2.0';
+  var ENGINE_VERSION = '0.9.0';
   function assembleCanonical(dataset, meta) {
     dataset = dataset || {}; meta = meta || {};
     var mats = dataset.materials || [];
@@ -749,7 +863,7 @@
     });
     // fold the initial-assessment harness's category upgrades onto the audit result,
     // so a re-derive PRESERVES them (they are an input, re-applied every run).
-    if (dataset.assessment) applyAssessment(materials, dataset.assessment);
+    var asum = dataset.assessment ? applyAssessment(materials, dataset.assessment) : null;
     var needs = materials.filter(function (m) { return m.identified === false; }).map(function (m) { return m.material; });
     // Auto-queue = LOW-confidence only, impact-sorted (net consumption then on-hand) —
     // the tail worth web-upgrading. 'none' items are NOT queued (they land in the
@@ -764,7 +878,9 @@
         tool: 'calibre-analysis-engine', generatedAt: meta.generatedAt || '',
         clientCode: meta.clientCode || '', site: meta.site || '',
         sourceFiles: meta.sourceFiles || {}, phase: meta.phase || 5, engineVersion: ENGINE_VERSION,
-        binsAsOf: meta.binsAsOf || ''
+        binsAsOf: meta.binsAsOf || '', drop: meta.drop || '',
+        assessment: asum ? { source: (meta.sourceFiles || {}).assessment || '', rows: asum.rows, eligible: asum.eligible,
+          category: asum.category, brand: asum.brand, oem_pn: asum.oem_pn } : null
       },
       counts: {
         materials: materials.length, families: families.length,
@@ -773,7 +889,9 @@
         units: (dataset.fleet || []).length, categoryReview: categoryReview.length,
         movers: materials.filter(function (m) { return (m.net_consumed || 0) > 0; }).length,
         zeroStock: materials.filter(function (m) { return !(m.on_hand > 0); }).length,
-        unitsWithSpecEvidence: (dataset.fleet || []).filter(function (u) { return u.spec && (Object.keys(u.spec.v || {}).length || Object.keys(u.spec.h || {}).length); }).length
+        unitsWithSpecEvidence: (dataset.fleet || []).filter(function (u) { return u.spec && (Object.keys(u.spec.v || {}).length || Object.keys(u.spec.h || {}).length); }).length,
+        unitsWithFieldCapture: Object.keys(dataset.field_equipment || {}).length,
+        sapFlags: (dataset.sap_flags || []).length, fieldSources: (dataset.field_sources || []).length
       },
       materials: materials,
       families: families,
@@ -783,7 +901,10 @@
       duplicate_disposition: dataset.duplicate_disposition || [],
       scoreboard: dataset.scoreboard || null,
       needs_identification: needs,
-      category_review: categoryReview
+      category_review: categoryReview,
+      field_equipment: dataset.field_equipment || {},
+      sap_flags: dataset.sap_flags || [],
+      field_sources: dataset.field_sources || []
     };
   }
 
@@ -791,13 +912,14 @@
     version: ENGINE_VERSION,
     s: s, round1: round1, postingMonth: postingMonth, numOrBlank: numOrBlank,
     indexIW39: indexIW39, derive: derive, consumedByFamily: consumedByFamily,
-    indexBy: indexBy, enrich: enrich, buildFleet: buildFleet,
+    indexBy: indexBy, enrich: enrich, buildFleet: buildFleet, fleetFromWhereUsed: fleetFromWhereUsed,
     // 0.8.0 additions — column contract, register seeding, canonical mapping, unit configuration
     assertColumns: assertColumns, COLS: COLS,
     seedRegister: seedRegister, toCanonicalMaterials: toCanonicalMaterials, buildBins: buildBins,
     buildEquipSpec: buildEquipSpec, buildEquipEvidence: buildEquipEvidence, buildUnitSpecs: buildUnitSpecs,
     classifyCategory: classifyCategory, applyAssessment: applyAssessment,
     verdictFromPiles: verdictFromPiles, mergeVerification: mergeVerification,
+    dedupeVerification: dedupeVerification, mergeFieldCapture: mergeFieldCapture,
     buildScoreboard: buildScoreboard, assembleCanonical: assembleCanonical, SCHEMA_VERSION: SCHEMA_VERSION
   };
 });

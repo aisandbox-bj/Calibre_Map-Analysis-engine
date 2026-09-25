@@ -4,6 +4,49 @@ Reverse-chronological. Each entry: what changed, why, and how to roll back. `eng
 
 ---
 
+## 2026-09-24 · engine.js **0.9.0** (schema **1.2.0**) — chain audit: assessment + field capture actually reach the dataset
+
+A full audit of Assessment → Engine → App → Viewer found the hand-offs broken. Engine changes (additive schema;
+derivation unchanged — GOLDEN EXACT 2062 on P1120):
+- **Verification de-duplicated** (`dedupeVerification`, latest ts per capture key; called by mergeVerification
+  and on every refresh). refresh carried `verification[]` forward AND re-merged bundles → live P1120 had 4 records
+  for 2 families and the removal scoreboard double-counted (8 dispositions / 6 reorder-risk → true 4 / 3).
+- **Verdict = the app's rule:** `verdictFromPiles(g, moved)` ignores 'nf' (not found) and reclassified-out members
+  (engine counted 'nf' as its own pile → could say SPLIT where the tech certified SAME).
+- **Field capture folded** (`mergeFieldCapture`): equipment comp serial/notes, accessories, spec answers and
+  confirmed build items → `field_equipment{}`; SAP flags → `sap_flags[]`; bundle provenance → `field_sources[]`.
+  Latest wins; idempotent. (Previously only family verdicts were read — equip/sapFlags/operators/photos ignored.)
+- **Assessment overlay guarded** (`applyAssessment` returns a change summary → `meta.assessment`): only High/Med,
+  never "Unclassified" (the harness holds 1,512 Low/Unclassified rows that would have overwritten SAP-desc
+  classifications); High identities fill a BLANK brand / OEM PN (`identity_source:'assessment'`).
+- `fleetFromWhereUsed()` — first build without a fleet register still gets a unit list.
+- `meta.drop`, `counts.unitsWithFieldCapture / sapFlags / fieldSources`.
+**viewer.html:** "Recorded in the field" card (unit), SAP-flag card + fleet row + identity source (part), family
+photo strips, Home chips for field records / SAP flags, Data page lists every source file (labelled) + a table of
+folded capture files; export named `CalibreMap_viewer_<client>_<date>.json`.
+**index.html:** marked an inspection/what-if tool (it drifted from refresh.js: no register seeding, identity,
+bins, cost, specs, assessment or field records); its export is now `CalibreMap_workingcopy_<date>.json`.
+Rollback: revert engine.js/viewer.html/index.html to the prior commit; re-run refresh (0.8.8 re-introduces the
+double-count).
+
+## 2026-09-24 · viewer.html — field-photo galleries + dataset-identity + capture-bundle detection (Phase 2)
+
+Photos-first pipeline. The viewer can now run as a **OneDrive-folder pack** (`data.js` + a `photos/` folder,
+opened locally — no server, no fetch). Additions, all graceful when the globals are absent (the classic single-file
+bundle is unchanged):
+- **Field-photo galleries.** `photoGallery()` + `lightbox()` read `window.__CALIBRE_PHOTOS__` (byMat / byUnit,
+  filenames under `photos/`) and render `<img>` thumbnails on `partView` (this part's field photos) and `unitView`
+  (unit dataplate / component / accessory photos). Absent global → helpers return [] → nothing renders.
+- **Dataset-identity strip** on Home (`datasetInfo()`): TYPE · CLIENT · DATE · PARTS · FAMILIES · UNITS · FIELD
+  PHOTOS, from `window.__CALIBRE_META__` / `DATA.meta`.
+- **Capture-bundle detection.** `ingest()` routes any `type:"capture"` JSON to `captureInfoView()` — a details
+  card (client / device / operator / exported / counts) instead of trying to render app-output as a dataset.
+- New build scripts (in the app repo): `Deliverables/build/build_viewer_pack.py` (emits the `CalibreMap_pack_*`
+  folder + externalises bundle photos to `photos/<sha1>.jpg`) and `bundle_viewer.py` renamed output to
+  `CalibreMap_viewer_<client>_<date>.html`, both injecting `__CALIBRE_META__`.
+Rollback: remove `photoGallery`/`lightbox`/`datasetInfo`/`captureInfoView` + their two call sites + the `.pgal`/
+`.dschip` CSS; the viewer reverts to the classic single-file behaviour. No engine.js change.
+
 ## 2026-09-24 · viewer.html — unit cost on the part card
 
 `partView` Stock & MRP card gains a **Unit cost** row (`m.unit_cost` → `$X · SAP moving avg`, else "not
